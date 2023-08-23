@@ -3,20 +3,20 @@ use std::io::Write;
 use std::str;
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
-pub fn print_colored(str: &str, color: Color) {
+pub fn print_warning(str: &str) {
+    print_colored(format!("注意: {}", str).as_str(), Color::Yellow);
+}
+
+fn print_colored(str: &str, color: Color) {
     let print_colored_internal = |stdout: &mut StandardStream| {
         stdout.set_color(ColorSpec::new().set_fg(Some(color)))?;
         writeln!(stdout, "{}", str)
     };
     let mut stdout = StandardStream::stdout(ColorChoice::Always);
     if let Err(_) = print_colored_internal(&mut stdout) {
-        println!("{}", str); // default back to normal printing if error
+        println!("{}", str); // 如果出现错误，改用普通打印
     }
     stdout.reset().unwrap_or_default();
-}
-
-pub fn print_warning(str: &str) {
-    print_colored(format!("注意: {}", str).as_str(), Color::Yellow);
 }
 
 pub fn print_error(error: &str) {
@@ -27,9 +27,19 @@ pub fn print_error_with_input(error: &str, input: &str) {
     println!("输入有误: {error} (当前为: {input})")
 }
 
+pub fn print_too_many_arguments_error() {
+    println!("提供的参数过多. 输入问号查看帮助.");
+}
+
+pub fn print_bad_format_error() {
+    println!("输入格式有误. 输入问号查看帮助.");
+}
+
 pub fn print_ice_times_and_cob_time(
-    ice_times: &[i32],
-    cob_time: i32,
+    game::IceAndCobTimes {
+        ice_times,
+        cob_time,
+    }: &game::IceAndCobTimes,
     min_max_garg_x: (f32, f32),
     delayed: bool,
 ) {
@@ -44,7 +54,7 @@ pub fn print_ice_times_and_cob_time(
         } else {
             "当前设定"
         },
-        match ice_times {
+        match ice_times.as_slice() {
             [] => "不用冰".to_string(),
             ice_times => format!("{:?}冰", ice_times),
         },
@@ -60,22 +70,25 @@ pub fn print_ice_times_and_cob_time(
 pub fn print_cob_calc_setting(
     cob_and_garg_rows: &[(game::Cob, Vec<i32>)],
     modified_min_max_garg_x: Option<(f32, f32)>,
+    cob_col_range: Option<(f32, f32)>,
 ) {
     println!(
-        "计算设定: {}{}",
+        "计算设定: {}{}{}",
         cob_and_garg_rows
             .iter()
             .map(|(cob, garg_rows)| { format!("{}炮炸{:?}路", cob.row(), garg_rows) })
             .collect::<Vec<String>>()
             .join(", "),
-        if let Some(modified_min_max_garg_x) = modified_min_max_garg_x {
-            format!(
-                ", 巨人x {}~{}",
-                modified_min_max_garg_x.0, modified_min_max_garg_x.1
-            )
+        if let Some((min_cob_col, max_cob_col)) = cob_col_range {
+            format!(", 落点{}~{}列", min_cob_col, max_cob_col)
         } else {
             "".to_string()
-        }
+        },
+        if let Some((min_garg_x, max_garg_x)) = modified_min_max_garg_x {
+            format!(", 巨人x {}~{}", min_garg_x, max_garg_x)
+        } else {
+            "".to_string()
+        },
     );
 }
 
@@ -107,7 +120,7 @@ pub fn print_eat_and_intercept(eat: &game::Eat, intercept: &game::Intercept) {
                 "{}~{}{}",
                 min,
                 max,
-                match game::intercept_interval_with_damage(&eat, &intercept) {
+                match game::unsafe_intercept_interval(&eat, &intercept) {
                     None => "".to_string(),
                     Some((min, max)) => format!(" ({}~{}有伤)", min, max),
                 }

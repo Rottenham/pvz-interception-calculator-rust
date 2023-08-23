@@ -22,13 +22,16 @@ fn main() -> Result<()> {
                 if let ParseResult::Matched = parser.parse_delay(input) {
                     continue;
                 }
-                if let ParseResult::Matched = parser.parse_cob(input) {
-                    continue;
-                }
                 if let ParseResult::Matched = parser.parse_doom(input) {
                     continue;
                 }
                 if let ParseResult::Matched = parser.parse_hit_or_nohit(input) {
+                    continue;
+                }
+                if let ParseResult::Matched = parser.parse_find_max_delay(input) {
+                    continue;
+                }
+                if let ParseResult::Matched = parser.parse_about(input) {
                     continue;
                 }
                 if let ParseResult::Matched = parser.parse_help(input) {

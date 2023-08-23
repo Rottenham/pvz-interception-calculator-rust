@@ -1,6 +1,33 @@
 pub const GARG_DATA_SIZE: usize = 2501;
 const DIVISOR: f32 = 32768.;
 
+pub fn garg_fast_of_half_ticks(half_ticks: i32) -> Option<f32> {
+    garg_of_half_ticks(&GARG_FAST, half_ticks)
+}
+
+pub fn garg_slow_of_half_ticks(half_ticks: i32) -> Option<f32> {
+    garg_of_half_ticks(&GARG_SLOW, half_ticks)
+}
+
+fn garg_of_half_ticks(array: &[i32; GARG_DATA_SIZE], half_ticks: i32) -> Option<f32> {
+    if half_ticks % 2 == 0 {
+        array
+            .get((half_ticks / 2) as usize)
+            .map(|v| *v as f32 / DIVISOR)
+    } else {
+        let (lower, higher) = (half_ticks - 1, half_ticks + 1);
+        match (
+            array.get((lower / 2) as usize),
+            array.get((higher / 2) as usize),
+        ) {
+            (None, _) | (_, None) => None,
+            (Some(lower_walk), Some(higher_walk)) => {
+                Some((*lower_walk as f32 * 0.5 + *higher_walk as f32 * 0.5) / DIVISOR)
+            }
+        }
+    }
+}
+
 // GARG_FAST and GARG_SLOW are provided by Reisen.
 // See alumkal/pvz-interception-calculator
 
@@ -514,30 +541,3 @@ const GARG_SLOW: [i32; GARG_DATA_SIZE] = [
     9306462, 9310658, 9314854, 9319050, 9323246, 9327442, 9331638, 9335694, 9339750, 9343806,
     9347862, 9351918, 9355974, 9360030, 9364086, 9368142, 9372198, 9376254, 9380310, 9384366,
 ];
-
-pub fn garg_fast_of_half_ticks(half_ticks: i32) -> Option<f32> {
-    garg_of_half_ticks(&GARG_FAST, half_ticks)
-}
-
-pub fn garg_slow_of_half_ticks(half_ticks: i32) -> Option<f32> {
-    garg_of_half_ticks(&GARG_SLOW, half_ticks)
-}
-
-fn garg_of_half_ticks(array: &[i32; GARG_DATA_SIZE], half_ticks: i32) -> Option<f32> {
-    if half_ticks % 2 == 0 {
-        array
-            .get((half_ticks / 2) as usize)
-            .map(|w| *w as f32 / DIVISOR)
-    } else {
-        let (lower, higher) = (half_ticks - 1, half_ticks + 1);
-        match (
-            array.get((lower / 2) as usize),
-            array.get((higher / 2) as usize),
-        ) {
-            (None, _) | (_, None) => None,
-            (Some(lower_walk), Some(higher_walk)) => {
-                Some((*lower_walk as f32 * 0.5 + *higher_walk as f32 * 0.5) / DIVISOR)
-            }
-        }
-    }
-}

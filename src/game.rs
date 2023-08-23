@@ -1,6 +1,5 @@
 use crate::constants;
-use core::panic;
-use std::{cmp, collections::HashSet, ops::Add, vec};
+use std::{cmp, ops::Add};
 
 const GRAVITY: Vec2 = Vec2 { x: 0., y: -0.05 };
 const COL_WIDTH: i32 = 80;
@@ -12,15 +11,15 @@ const GARG_THROW_IMP_THRES: f32 = 401.;
 const IMP_DEFENSE_SHIFT: IntVec2 = IntVec2 { x: 36, y: 0 };
 const IMP_DEFENSE_WIDTH: i32 = 42;
 const IMP_DEFENSE_HEIGHT: i32 = 115;
-pub const ICE_SLOW_TOTAL_TIME: i32 = 2000;
 const MIN_GARG_START_POS: f32 = 845.;
 const MAX_GARG_START_POS: f32 = 854.;
-pub const MIN_GARG_X: f32 = -152.; // if x <= -152., garg enters home
+pub const MIN_GARG_X: f32 = -152.; // 如果 x <= -152., 巨人将进家
 pub const MAX_GARG_X: f32 = MAX_GARG_START_POS;
 const MIN_ICE_TIME_FOR_UNICED: i32 = 400;
 const MAX_ICE_TIME_FOR_UNICED: i32 = 600;
 const MIN_ICE_TIME_FOR_ICED: i32 = 300;
 const MAX_ICE_TIME_FOR_ICED: i32 = 400;
+pub const ICE_SLOW_TOTAL_TIME: i32 = 2000;
 const DE_COB_DIST: CobDist = CobDist {
     hit_above: 111,
     hit_same: 125,
@@ -142,7 +141,6 @@ fn circle_rectangle_intersect(
     } else {
         *cir_x
     };
-
     let y = if *cir_y < *rect_y {
         *rect_y
     } else if *cir_y > *rect_y + *rect_h {
@@ -150,7 +148,6 @@ fn circle_rectangle_intersect(
     } else {
         *cir_y
     };
-
     ((*cir_x - x).pow(2) + (*cir_y - y).pow(2)) <= radius.pow(2)
 }
 
@@ -182,11 +179,33 @@ impl Scene {
         }
     }
 
-    fn garg_rows(&self) -> Vec<i32> {
-        match self {
+    pub fn garg_rows_for_cob(&self, hit_row: i32) -> Vec<i32> {
+        let mut garg_rows = self
+            .hittable_rows(hit_row, COB_HIT_RANGE)
+            .into_iter()
+            .collect::<Vec<i32>>();
+        garg_rows.sort();
+        garg_rows
+    }
+
+    pub fn garg_rows_for_doom(&self, doom_row: i32) -> Vec<i32> {
+        let mut garg_rows = self
+            .hittable_rows(doom_row, DOOM_HIT_RANGE)
+            .into_iter()
+            .collect::<Vec<i32>>();
+        garg_rows.sort();
+        garg_rows
+    }
+
+    fn hittable_rows(&self, hit_row: i32, hit_range: i32) -> Vec<i32> {
+        let garg_rows = match self {
             Scene::DE | Scene::RE => vec![1, 2, 3, 4, 5],
             Scene::PE => vec![1, 2, 5, 6],
-        }
+        };
+        garg_rows
+            .into_iter()
+            .filter(|&v| (v - hit_row).abs() <= hit_range)
+            .collect()
     }
 
     pub fn default_delay_mode(&self, hit_col: f32, cob_col: Option<i32>) -> DelayMode {
@@ -203,15 +222,10 @@ impl Scene {
                 if hit_col <= 5. {
                     DelayMode::Delay3
                 } else {
-                    match cob_col {
-                        None => panic!("需指定炮尾所在列."),
-                        Some(cob_col) => {
-                            if cob_col <= 4 {
-                                DelayMode::Delay3
-                            } else {
-                                DelayMode::Delay2
-                            }
-                        }
+                    if cob_col.expect("需指定炮尾所在列.") <= 4 {
+                        DelayMode::Delay3
+                    } else {
+                        DelayMode::Delay2
                     }
                 }
             }
@@ -245,7 +259,9 @@ impl Scene {
         match self {
             Scene::DE => &DE_COB_DIST,
             Scene::PE => &PE_COB_DIST,
-            Scene::RE => RE_COB_DIST.get((cob_col.unwrap() - 1) as usize).unwrap(),
+            Scene::RE => RE_COB_DIST
+                .get((cob_col.expect("需指定炮尾所在列.") - 1) as usize)
+                .expect("没有对应该炮尾所在列的炮距数据."),
         }
     }
 
@@ -255,42 +271,20 @@ impl Scene {
             Scene::PE | Scene::RE => 85,
         }
     }
+
     fn zombie_base_y(&self) -> i32 {
         match self {
             Scene::DE | Scene::PE => 50,
             Scene::RE => 40,
         }
     }
+
     fn is_roof(&self) -> bool {
         *self == Scene::RE
     }
-
-    fn hittable_rows(&self, hit_row: i32, hit_range: i32) -> HashSet<i32> {
-        self.garg_rows()
-            .into_iter()
-            .filter(|&v| (v - hit_row).abs() <= hit_range)
-            .collect()
-    }
-
-    pub fn garg_rows_for_cob(&self, hit_row: i32) -> Vec<i32> {
-        let mut garg_rows = self
-            .hittable_rows(hit_row, COB_HIT_RANGE)
-            .into_iter()
-            .collect::<Vec<i32>>();
-        garg_rows.sort();
-        garg_rows
-    }
-
-    pub fn garg_rows_for_doom(&self, doom_row: i32) -> Vec<i32> {
-        let mut garg_rows = self
-            .hittable_rows(doom_row, DOOM_HIT_RANGE)
-            .into_iter()
-            .collect::<Vec<i32>>();
-        garg_rows.sort();
-        garg_rows
-    }
 }
 
+#[derive(Clone)]
 pub enum Cob {
     Ground {
         row: i32,
@@ -300,7 +294,7 @@ pub enum Cob {
         row: i32,
         col: f32,
         cob_col: i32,
-        cob_row: Option<i32>,
+        cob_row: i32,
     },
 }
 
@@ -316,6 +310,17 @@ impl Cob {
             } => *row,
         }
     }
+    pub fn col(&self) -> f32 {
+        match self {
+            Cob::Ground { row: _, col } => *col,
+            Cob::Roof {
+                row: _,
+                col,
+                cob_col: _,
+                cob_row: _,
+            } => *col,
+        }
+    }
 }
 
 pub struct Doom {
@@ -326,7 +331,7 @@ pub struct Doom {
 #[derive(Debug, Clone)]
 pub struct Explode {
     range: Circle,
-    rows: HashSet<i32>,
+    hittable_rows: Vec<i32>,
 }
 
 impl Explode {
@@ -334,7 +339,7 @@ impl Explode {
         let row_height = scene.row_height();
         match cob {
             Cob::Ground { row, col } => {
-                let mut x = (col * COL_WIDTH as f32) as i32;
+                let mut x = (col * COL_WIDTH as f32).round() as i32;
                 x = if x >= 7 { x - 7 } else { x - 6 };
                 let y = 120 + ((row - 1) * row_height);
                 Explode {
@@ -342,7 +347,7 @@ impl Explode {
                         center: IntVec2 { x, y },
                         radius: COB_RADIUS,
                     },
-                    rows: scene.hittable_rows(*row, COB_HIT_RANGE),
+                    hittable_rows: scene.hittable_rows(*row, COB_HIT_RANGE),
                 }
             }
             Cob::Roof {
@@ -351,7 +356,7 @@ impl Explode {
                 cob_col,
                 cob_row,
             } => {
-                let mut x = (col * COL_WIDTH as f32) as i32;
+                let mut x = (col * COL_WIDTH as f32).round() as i32;
                 let mut y = 209 + (row - 1) * row_height;
 
                 let step1: i32;
@@ -390,15 +395,11 @@ impl Explode {
                 y -= step2;
 
                 if x == left_edge && *cob_col >= 2 && *cob_col <= 6 {
-                    if let Some(cob_row) = cob_row {
-                        if *cob_row >= 3 && *cob_row <= 5 {
-                            y += 5;
-                        }
-                        if *cob_row == 3 && *cob_col == 6 {
-                            y -= 5;
-                        }
-                    } else {
-                        panic!("特殊落点，需要指定炮所在行");
+                    if *cob_row >= 3 && *cob_row <= 5 {
+                        y += 5;
+                    }
+                    if *cob_row == 3 && *cob_col == 6 {
+                        y -= 5;
                     }
                 }
 
@@ -409,7 +410,7 @@ impl Explode {
                         center: IntVec2 { x, y },
                         radius: COB_RADIUS,
                     },
-                    rows: scene.hittable_rows(*row, COB_HIT_RANGE),
+                    hittable_rows: scene.hittable_rows(*row, COB_HIT_RANGE),
                 }
             }
         }
@@ -424,7 +425,7 @@ impl Explode {
                 },
                 radius: DOOM_RADIUS,
             },
-            rows: scene.hittable_rows(*row, DOOM_HIT_RANGE),
+            hittable_rows: scene.hittable_rows(*row, DOOM_HIT_RANGE),
         }
     }
 }
@@ -446,8 +447,14 @@ struct Position {
 }
 
 impl Position {
-    fn interceptable(&self, Explode { range, rows }: &Explode) -> bool {
-        rows.contains(&self.row)
+    fn interceptable(
+        &self,
+        Explode {
+            range,
+            hittable_rows,
+        }: &Explode,
+    ) -> bool {
+        hittable_rows.contains(&self.row)
             && circle_rectangle_intersect(
                 range,
                 &Rectangle {
@@ -597,29 +604,29 @@ pub enum GargXRange {
 }
 
 impl GargXRange {
+    pub fn of_min_max_garg_pos(min_max_garg_pos: (f32, f32)) -> GargXRange {
+        let (min_garg_x, max_garg_x) = min_max_garg_pos;
+        if min_garg_x < GARG_THROW_IMP_THRES {
+            if max_garg_x < GARG_THROW_IMP_THRES {
+                GargXRange::Cancelled
+            } else {
+                GargXRange::Modified {
+                    min: GARG_THROW_IMP_THRES,
+                    max: max_garg_x,
+                }
+            }
+        } else {
+            GargXRange::Ok {
+                min: min_garg_x,
+                max: max_garg_x,
+            }
+        }
+    }
+
     fn to_list(&self) -> Vec<f32> {
         match self {
             GargXRange::Cancelled => vec![],
             GargXRange::Modified { min, max } | GargXRange::Ok { min, max } => vec![*min, *max],
-        }
-    }
-}
-
-pub fn validate_garg_x_range(min_max_garg_pos: (f32, f32)) -> GargXRange {
-    let (min_garg_x, max_garg_x) = min_max_garg_pos;
-    if min_garg_x < GARG_THROW_IMP_THRES {
-        if max_garg_x < GARG_THROW_IMP_THRES {
-            GargXRange::Cancelled
-        } else {
-            GargXRange::Modified {
-                min: GARG_THROW_IMP_THRES,
-                max: max_garg_x,
-            }
-        }
-    } else {
-        GargXRange::Ok {
-            min: min_garg_x,
-            max: max_garg_x,
         }
     }
 }
@@ -634,8 +641,10 @@ pub fn judge(
     let mut intercept = Intercept::Empty;
     for (explode, garg_rows) in explode_and_garg_rows {
         for garg_x in garg_x_range.to_list() {
+            // 只考虑巨人x极值得到的最早啃/冰绝对精确，但可拦区间并非绝对精确，可能存在接近边界的反例值
             for &garg_row in *garg_rows {
                 for rnd in [0, 100] {
+                    // rnd 单调影响y初速，只需考虑极值
                     let (new_eat, new_intercept) = judge_internal(
                         &Vec2 {
                             x: garg_x,
@@ -656,6 +665,7 @@ pub fn judge(
     (eat, intercept)
 }
 
+// 默认炮激活、炮拦截
 fn judge_internal(
     garg_pos: &Vec2,
     garg_row: i32,
@@ -730,11 +740,11 @@ fn judge_internal(
                 };
                 eat = Eat::Both {
                     eat: match eat {
+                        Eat::OnlyEat(eat) | Eat::Both { eat, iceable: _ } => eat,
                         Eat::Empty => cmp::min(
                             diff_til_next_multiple(imp.exist_time, eat_loop) + tick,
                             diff_til_next_multiple(imp.exist_time - 1, eat_loop) + tick,
                         ),
-                        Eat::OnlyEat(eat) | Eat::Both { eat, iceable: _ } => eat,
                     },
                     iceable: tick + 1,
                 };
@@ -746,17 +756,46 @@ fn judge_internal(
     (eat, intercept)
 }
 
-pub fn min_max_garg_x(sorted_ice_times: &[i32], cob_time: i32) -> Result<(f32, f32), String> {
-    if cob_time < 0 {
-        return Err(format!("炮生效时间应≥0 (当前为: {cob_time})"));
+pub struct IceAndCobTimes {
+    pub ice_times: Vec<i32>,
+    pub cob_time: i32,
+}
+
+impl IceAndCobTimes {
+    pub fn of_ice_times_and_cob_time(
+        ice_times: &[i32],
+        cob_time: i32,
+    ) -> Result<IceAndCobTimes, String> {
+        if cob_time < 0 {
+            return Err(format!("炮生效时间应≥0 (当前为: {cob_time})"));
+        }
+        let mut ice_times = ice_times
+            .iter()
+            .filter(|&&v| v >= 0 && v <= cob_time)
+            .cloned()
+            .collect::<Vec<i32>>();
+        ice_times.sort();
+        Ok(IceAndCobTimes {
+            ice_times,
+            cob_time,
+        })
     }
-    let valid_ice_times = sorted_ice_times
-        .iter()
-        .filter(|&&v| v >= 0 && v <= cob_time)
-        .cloned()
-        .collect::<Vec<i32>>();
-    let (min_half_ticks, max_half_ticks) =
-        min_max_garg_walk_in_half_ticks(&valid_ice_times, cob_time);
+
+    pub fn is_iced(&self) -> bool {
+        match (self.ice_times.last(), self.cob_time) {
+            (None, _) => false,
+            (Some(last_ice_time), cob_time) => cob_time - last_ice_time <= ICE_SLOW_TOTAL_TIME,
+        }
+    }
+}
+
+pub fn min_max_garg_x(
+    IceAndCobTimes {
+        ice_times,
+        cob_time,
+    }: &IceAndCobTimes,
+) -> Result<(f32, f32), String> {
+    let (min_half_ticks, max_half_ticks) = min_max_garg_walk_in_half_ticks(&ice_times, *cob_time);
     match (
         constants::garg_slow_of_half_ticks(min_half_ticks),
         constants::garg_fast_of_half_ticks(max_half_ticks),
@@ -809,18 +848,18 @@ fn garg_walk_in_half_ticks(
     }
 
     impl Tick {
-        // Return # of half ticks (i.e. 0.5 tick)
+        // 返回值单位为 0.5cs
         fn diff_in_half_ticks(old_tick: &Tick, new_tick: &Tick) -> i32 {
             let prorated_walk = |walk: i32, ice_length| {
                 let uniced_walk = cmp::max(walk - (ICE_SLOW_TOTAL_TIME - ice_length), 0);
                 (walk - uniced_walk) + uniced_walk * 2
             };
             match (new_tick, old_tick) {
-                (Tick::Start(_), _) => panic!("Tick::Start must be the earlier one"),
+                (Tick::Start(_), _) => panic!("Tick::Start只能是被减数"),
                 (Tick::Ice { time: _, length: _ }, Tick::Cob(_)) => {
-                    panic!("Tick::Cob must not be earlier than Tick::Ice")
+                    panic!("Tick::Cob须晚于Tick::Ice")
                 }
-                (Tick::Cob(_), Tick::Cob(_)) => panic!("Tick::Cob must be unique"),
+                (Tick::Cob(_), Tick::Cob(_)) => panic!("Tick::Cob只能存在一个"),
                 (
                     Tick::Ice {
                         time: new_time,
@@ -887,10 +926,10 @@ pub fn hit_col_matching_int_pixel(unvalidated_hit_col: f32) -> Option<f32> {
     }
 }
 
-pub fn intercept_interval_with_damage(eat: &Eat, intercept: &Intercept) -> Option<(i32, i32)> {
-    match (&intercept, &eat) {
-        (Intercept::Success { min, max }, Eat::OnlyEat(eat))
-        | (Intercept::Success { min, max }, Eat::Both { eat, iceable: _ })
+pub fn unsafe_intercept_interval(eat: &Eat, intercept: &Intercept) -> Option<(i32, i32)> {
+    match (&eat, &intercept) {
+        (Eat::OnlyEat(eat), Intercept::Success { min, max })
+        | (Eat::Both { eat, iceable: _ }, Intercept::Success { min, max })
             if eat <= max =>
         {
             Some((cmp::max(*eat, *min), *max))
@@ -899,10 +938,15 @@ pub fn intercept_interval_with_damage(eat: &Eat, intercept: &Intercept) -> Optio
     }
 }
 
-pub fn is_iced(last_ice_time: Option<i32>, cob_time: i32) -> bool {
-    match (last_ice_time, cob_time) {
-        (None, _) => false,
-        (Some(last_ice_time), cob_time) => cob_time - last_ice_time <= ICE_SLOW_TOTAL_TIME,
+pub fn safe_intercept_interval(eat: &Eat, intercept: &Intercept) -> Option<(i32, i32)> {
+    match (&eat, &intercept) {
+        (Eat::OnlyEat(eat), Intercept::Success { min, max })
+        | (Eat::Both { eat, iceable: _ }, Intercept::Success { min, max })
+            if eat > min =>
+        {
+            Some((*min, cmp::min(*eat - 1, *max)))
+        }
+        _ => None,
     }
 }
 
@@ -979,7 +1023,7 @@ mod tests {
                 row: 1,
                 col: 8.5,
                 cob_col: 3,
-                cob_row: None,
+                cob_row: 3,
             },
             &scene,
         );
