@@ -10,13 +10,14 @@ pub fn print_warning(str: &str) {
 fn print_colored(str: &str, color: Color) {
     let print_colored_internal = |stdout: &mut StandardStream| {
         stdout.set_color(ColorSpec::new().set_fg(Some(color)))?;
-        writeln!(stdout, "{}", str)
+        write!(stdout, "{}", str)
     };
     let mut stdout = StandardStream::stdout(ColorChoice::Always);
     if let Err(_) = print_colored_internal(&mut stdout) {
         println!("{}", str); // 如果出现错误，改用普通打印
     }
     stdout.reset().unwrap_or_default();
+    println!("");
 }
 
 pub fn print_error(error: &str) {
