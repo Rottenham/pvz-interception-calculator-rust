@@ -3,10 +3,8 @@ use std::io::Write;
 use std::str;
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
-const YELLOW: Color = Color::Rgb(229, 229, 77);
-
 pub fn print_warning(str: &str) {
-    print_colored(format!("注意: {}", str).as_str(), YELLOW);
+    print_colored(format!("注意: {}", str).as_str(), Color::Yellow);
 }
 
 fn print_colored(str: &str, color: Color) {
@@ -119,14 +117,14 @@ pub fn print_eat_and_intercept(eat: &game::Eat, intercept: &game::Intercept) {
     print!("可拦区间: ");
     match intercept {
         game::Intercept::Empty | game::Intercept::OnlyHighIndexImp | game::Intercept::Fail => {
-            print_colored("无法拦截", YELLOW)
+            print_colored("无法拦截", Color::Yellow)
         }
         game::Intercept::Success { min, max } => {
             print!("{}~{}", min, max,);
             match game::unsafe_intercept_interval(&eat, &intercept) {
                 None => println!(""),
                 Some((min, max)) => {
-                    print_colored(format!(" ({}~{}有伤)", min, max).as_str(), YELLOW)
+                    print_colored(format!(" ({}~{}有伤)", min, max).as_str(), Color::Yellow)
                 }
             }
         }
