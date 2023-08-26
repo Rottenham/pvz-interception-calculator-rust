@@ -1,3 +1,4 @@
+use crate::constants;
 use crate::game;
 use crate::printer;
 
@@ -142,8 +143,9 @@ impl Parser {
                         return ParseResult::Unmatched;
                     }
                 };
-                let (cob_and_garg_rows, mut min_max_garg_x, ice_flag): (
+                let (cob_and_garg_rows, mut min_max_garg_x, ice_flag, explode_to_print): (
                     Vec<(game::Cob, Vec<i32>)>,
+                    _,
                     _,
                     _,
                 ) = if self.scene != game::Scene::RE {
@@ -169,16 +171,15 @@ impl Parser {
                                 ) else {
                                     return ParseResult::Matched;
                                 };
+                            let cob = game::Cob::Ground {
+                                row: hit_row,
+                                col: hit_col,
+                            };
                             (
-                                vec![(
-                                    game::Cob::Ground {
-                                        row: hit_row,
-                                        col: hit_col,
-                                    },
-                                    garg_rows,
-                                )],
+                                vec![(cob.clone(), garg_rows)],
                                 min_max_garg_x.unwrap_or(self.min_max_garg_x),
                                 ice_flag.unwrap_or(self.ice_and_cob_times.is_iced()),
+                                Some(game::Explode::of_cob(&cob, &self.scene)),
                             )
                         }
                         [] => {
@@ -209,6 +210,7 @@ impl Parser {
                                     .collect(),
                                 self.min_max_garg_x,
                                 self.ice_and_cob_times.is_iced(),
+                                None,
                             )
                         }
                         _ => {
@@ -246,18 +248,17 @@ impl Parser {
                                 ) else {
                                     return ParseResult::Matched;
                                 };
+                            let cob = game::Cob::Roof {
+                                row: hit_row,
+                                col: hit_col,
+                                cob_col: cob_col,
+                                cob_row: DEFAULT_ROOF_COB_ROW,
+                            };
                             (
-                                vec![(
-                                    game::Cob::Roof {
-                                        row: hit_row,
-                                        col: hit_col,
-                                        cob_col: cob_col,
-                                        cob_row: DEFAULT_ROOF_COB_ROW,
-                                    },
-                                    garg_rows,
-                                )],
+                                vec![(cob.clone(), garg_rows)],
                                 min_max_garg_x.unwrap_or(self.min_max_garg_x),
                                 ice_flag.unwrap_or(self.ice_and_cob_times.is_iced()),
+                                Some(game::Explode::of_cob(&cob, &self.scene)),
                             )
                         }
                         [] => {
@@ -295,6 +296,7 @@ impl Parser {
                                     .collect(),
                                 self.min_max_garg_x,
                                 self.ice_and_cob_times.is_iced(),
+                                None,
                             )
                         }
                         _ => {
@@ -315,6 +317,7 @@ impl Parser {
                     game::judge(&garg_x_range, &explode_and_garg_rows, ice_flag, &self.scene);
                 printer::print_cob_calc_setting(
                     &cob_and_garg_rows,
+                    explode_to_print,
                     if (min_max_garg_x) != self.min_max_garg_x {
                         Some(min_max_garg_x)
                     } else {
@@ -346,11 +349,19 @@ impl Parser {
                 ) else {
                     return ParseResult::Matched;
                 };
-                let (garg_rows, mut min_max_garg_x, ice_flag) = match extra_args {
+                let explode = game::Explode::of_doom(
+                    &game::Doom {
+                        row: doom_row,
+                        col: doom_col,
+                    },
+                    &self.scene,
+                );
+                let (garg_rows, mut min_max_garg_x, ice_flag, explode_to_print) = match extra_args {
                     [] => (
                         self.scene.garg_rows_for_doom(doom_row),
                         self.min_max_garg_x,
                         self.ice_and_cob_times.is_iced(),
+                        None,
                     ),
                     [">", garg_pos_args @ ..] => {
                         let Ok((garg_rows, min_max_garg_x, ice_flag)) = Parser::parse_garg_pos(
@@ -363,6 +374,7 @@ impl Parser {
                             garg_rows,
                             min_max_garg_x.unwrap_or(self.min_max_garg_x),
                             ice_flag.unwrap_or(self.ice_and_cob_times.is_iced()),
+                            Some(&explode),
                         )
                     }
                     _ => {
@@ -376,16 +388,7 @@ impl Parser {
                 };
                 let (mut eat, mut intercept) = game::judge(
                     &garg_x_range,
-                    &vec![(
-                        game::Explode::of_doom(
-                            &game::Doom {
-                                row: doom_row,
-                                col: doom_col,
-                            },
-                            &self.scene,
-                        ),
-                        &garg_rows,
-                    )],
+                    &vec![(explode.clone(), &garg_rows)],
                     ice_flag,
                     &self.scene,
                 );
@@ -394,6 +397,7 @@ impl Parser {
                 printer::print_doom_calc_setting(
                     doom_row,
                     &garg_rows,
+                    explode_to_print,
                     if min_max_garg_x != self.min_max_garg_x {
                         Some(min_max_garg_x)
                     } else {
@@ -657,6 +661,7 @@ impl Parser {
                 }
                 printer::print_cob_calc_setting(
                     &vec![(cob_list[0].clone(), garg_rows)],
+                    None,
                     if min_max_garg_x != self.min_max_garg_x {
                         Some(min_max_garg_x)
                     } else {
@@ -681,6 +686,32 @@ impl Parser {
                         printer::print_eat_and_intercept(&eat, &intercept);
                     }
                 };
+                ParseResult::Matched
+            }
+            _ => ParseResult::Unmatched,
+        }
+    }
+
+    pub fn parse_garg_x_range_of_imp_x(&self, input: &str) -> ParseResult {
+        match input.split_whitespace().collect::<Vec<&str>>().as_slice() {
+            ["imp"] => {
+                printer::print_error("请提供小鬼x坐标（整数）");
+                ParseResult::Matched
+            }
+            ["imp", imp_x] => {
+                let Ok(imp_x) = imp_x.parse::<i32>() else {
+                    printer::print_error_with_input("小鬼x坐标应为整数", &imp_x);
+                    return ParseResult::Matched;
+                };
+                let Some((min_garg_x, max_garg_x)) = constants::min_max_garg_pos_of_imp_x(imp_x) else {
+                    printer::print_error_with_input(format!("应满足{}≤小鬼x坐标≤{}", constants::MIN_IMP_X, constants::MAX_IMP_X).as_str(), imp_x.to_string().as_str());
+                    return ParseResult::Matched;
+                };
+                println!("巨人x范围: {:.3}~{:.3}", min_garg_x, max_garg_x);
+                ParseResult::Matched
+            }
+            ["imp", ..] => {
+                printer::print_too_many_arguments_error();
                 ParseResult::Matched
             }
             _ => ParseResult::Unmatched,
@@ -1013,7 +1044,7 @@ fn combine_results3<T, U, V, E>(
 const HELLO_TEXT: &str = r#"本程序源码以MIT许可证发布:
 https://github.com/Rottenham/pvz-interception-calculator-rust
 
-欢迎使用拦截计算器v2.0.3.
+欢迎使用拦截计算器v2.0.4.
 当前场合: 后院.
 输入问号查看帮助; 按↑键显示上次输入的指令.
 
@@ -1070,6 +1101,8 @@ nohit (炮尾列) (延迟)                计算刚好不伤巨人的炮落点�
 max 炮行数 炮列数范围
   > 巨人所在行 (巨人x范围) (u/i)     寻找无伤拦截可延迟最多的炮落点列（可指定按原速/减速计算）
                                      例：$ max 1 7,7.5 > 1,2 -> 寻找1路7~7.5列炮拦截1、2路巨人可延迟最多的落点
+
+imp 小鬼x坐标                        计算投掷该坐标小鬼的巨人x范围
 
 ?/help                               显示此帮助
 about                                关于拦截计算器"#;

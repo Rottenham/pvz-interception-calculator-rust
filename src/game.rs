@@ -92,9 +92,9 @@ impl Add for Vec2 {
 }
 
 #[derive(Debug, Clone)]
-struct IntVec2 {
-    x: i32,
-    y: i32,
+pub struct IntVec2 {
+    pub x: i32,
+    pub y: i32,
 }
 
 impl Add for IntVec2 {
@@ -115,8 +115,8 @@ struct Rectangle {
 }
 
 #[derive(Debug, Clone)]
-struct Circle {
-    center: IntVec2,
+pub struct Circle {
+    pub center: IntVec2,
     radius: i32,
 }
 
@@ -330,7 +330,7 @@ pub struct Doom {
 
 #[derive(Debug, Clone)]
 pub struct Explode {
-    range: Circle,
+    pub range: Circle,
     hittable_rows: Vec<i32>,
 }
 
@@ -748,7 +748,7 @@ fn judge_internal(
                     },
                     iceable: tick + 1,
                 };
-                return (eat, intercept);
+                break;
             }
         }
         intercept.update(tick, &imp.position, explode);

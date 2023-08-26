@@ -70,11 +70,12 @@ pub fn print_ice_times_and_cob_time(
 
 pub fn print_cob_calc_setting(
     cob_and_garg_rows: &[(game::Cob, Vec<i32>)],
+    explode: Option<game::Explode>,
     modified_min_max_garg_x: Option<(f32, f32)>,
     cob_col_range: Option<(f32, f32)>,
 ) {
     println!(
-        "计算设定: {}{}{}",
+        "计算设定: {}{}{}{}",
         cob_and_garg_rows
             .iter()
             .map(|(cob, garg_rows)| { format!("{}炮炸{:?}路", cob.row(), garg_rows) })
@@ -85,8 +86,16 @@ pub fn print_cob_calc_setting(
         } else {
             "".to_string()
         },
+        if let Some(explode) = explode {
+            format!(
+                ", 爆心x={} y={}",
+                explode.range.center.x, explode.range.center.y
+            )
+        } else {
+            "".to_string()
+        },
         if let Some((min_garg_x, max_garg_x)) = modified_min_max_garg_x {
-            format!(", 巨人x {}~{}", min_garg_x, max_garg_x)
+            format!(", 巨人x={}~{}", min_garg_x, max_garg_x)
         } else {
             "".to_string()
         }
@@ -96,15 +105,24 @@ pub fn print_cob_calc_setting(
 pub fn print_doom_calc_setting(
     doom_row: i32,
     garg_rows: &[i32],
+    explode: Option<&game::Explode>,
     modified_min_max_garg_x: Option<(f32, f32)>,
 ) {
     println!(
-        "计算设定: {}核炸{:?}路{}",
+        "计算设定: {}核炸{:?}路{}{}",
         doom_row,
         garg_rows,
+        if let Some(explode) = explode {
+            format!(
+                ", 爆心x={} y={}",
+                explode.range.center.x, explode.range.center.y
+            )
+        } else {
+            "".to_string()
+        },
         if let Some(modified_min_max_garg_x) = modified_min_max_garg_x {
             format!(
-                ", 巨人x {}~{}",
+                ", 巨人x={}~{}",
                 modified_min_max_garg_x.0, modified_min_max_garg_x.1
             )
         } else {
