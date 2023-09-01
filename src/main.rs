@@ -1,18 +1,18 @@
 use rustyline::error::ReadlineError;
 use rustyline::{DefaultEditor, Result};
 
-use interception_calculator;
-use interception_calculator::parser::ParseResult;
+use pvz_interception_calculator;
 
 fn main() -> Result<()> {
     let mut rl = DefaultEditor::new()?;
-    let mut parser = interception_calculator::parser::Parser::new();
+    let mut parser = pvz_interception_calculator::parser::Parser::new();
     loop {
         let readline = rl.readline("\n$ ");
         match readline {
             Ok(line) => {
                 rl.add_history_entry(line.as_str()).unwrap();
                 let input = line.trim().to_lowercase();
+                use pvz_interception_calculator::parser::ParseResult;
                 if let ParseResult::Matched = parser.parse_scene(input.as_str()) {
                     continue;
                 }

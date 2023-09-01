@@ -2,6 +2,7 @@ use crate::constants;
 use crate::game;
 use crate::printer;
 
+const DEFAULT_SCENE: game::Scene = game::Scene::PE;
 const DEFAULT_COB_TIME: i32 = 318;
 const DEFAULT_ROOF_COB_ROW: i32 = 3;
 
@@ -36,11 +37,12 @@ pub enum ParseResult {
 impl Parser {
     pub fn new() -> Parser {
         println!("{}", HELLO_TEXT);
+        let scene = DEFAULT_SCENE;
         let ice_and_cob_times =
             game::IceAndCobTimes::of_ice_times_and_cob_time(&vec![], DEFAULT_COB_TIME).unwrap();
         let min_max_garg_x = game::min_max_garg_x(&ice_and_cob_times).unwrap();
         Parser {
-            scene: game::Scene::PE,
+            scene,
             ice_and_cob_times,
             min_max_garg_x,
         }
@@ -87,8 +89,8 @@ impl Parser {
 
     pub fn parse_wave(&mut self, input: &str) -> ParseResult {
         match input.split_whitespace().collect::<Vec<&str>>().as_slice() {
-            ["wave", extra_args @ ..] => {
-                match extra_args {
+            ["wave", all_args @ ..] => {
+                match all_args {
                     [] => {
                         printer::print_ice_times_and_cob_time(
                             &self.ice_and_cob_times,
@@ -334,88 +336,91 @@ impl Parser {
 
     pub fn parse_doom(&self, input: &str) -> ParseResult {
         match input.split_whitespace().collect::<Vec<&str>>().as_slice() {
-            ["doom"] => {
-                printer::print_error("请提供核所在行、核所在列");
-                ParseResult::Matched
-            }
-            ["doom", _] => {
-                printer::print_error("请提供核所在列");
-                ParseResult::Matched
-            }
-            ["doom", doom_row, doom_col, extra_args @ ..] => {
-                let Ok((doom_row, doom_col)) = combine_results(
+            ["doom", all_args @ ..] => match all_args {
+                [] => {
+                    printer::print_error("请提供核所在行、核所在列");
+                    ParseResult::Matched
+                }
+                [_] => {
+                    printer::print_error("请提供核所在列");
+                    ParseResult::Matched
+                }
+                [doom_row, doom_col, extra_args @ ..] => {
+                    let Ok((doom_row, doom_col)) = combine_results(
                     Parser::parse_doom_row(doom_row, &self.scene.all_rows()),
                     Parser::parse_doom_col(doom_col),
-                ) else {
-                    return ParseResult::Matched;
-                };
-                let explode = game::Explode::of_doom(
-                    &game::Doom {
-                        row: doom_row,
-                        col: doom_col,
-                    },
-                    &self.scene,
-                );
-                let (garg_rows, mut min_max_garg_x, ice_flag, explode_to_print) = match extra_args {
-                    [] => (
-                        self.scene.garg_rows_for_doom(doom_row),
-                        self.min_max_garg_x,
-                        self.ice_and_cob_times.is_iced(),
-                        None,
-                    ),
-                    [">", garg_pos_args @ ..] => {
-                        let Ok((garg_rows, min_max_garg_x, ice_flag)) = Parser::parse_garg_pos(
-                            garg_pos_args,
-                            &self.scene.garg_rows_for_doom(doom_row),
-                        ) else {
-                            return ParseResult::Matched;
-                        };
-                        (
-                            garg_rows,
-                            min_max_garg_x.unwrap_or(self.min_max_garg_x),
-                            ice_flag.unwrap_or(self.ice_and_cob_times.is_iced()),
-                            Some(&explode),
-                        )
-                    }
-                    _ => {
-                        printer::print_too_many_arguments_error();
+                    ) else {
                         return ParseResult::Matched;
-                    }
-                };
-                let Ok(garg_x_range) = validate_garg_x_range(&mut min_max_garg_x)
-                else {
-                    return ParseResult::Matched;
-                };
-                let (mut eat, mut intercept) = game::judge(
-                    &garg_x_range,
-                    &vec![(explode.clone(), &garg_rows)],
-                    ice_flag,
-                    &self.scene,
-                );
-                eat.shift_to_plant_intercept();
-                intercept.shift_to_plant_intercept();
-                printer::print_doom_calc_setting(
-                    doom_row,
-                    &garg_rows,
-                    explode_to_print,
-                    if min_max_garg_x != self.min_max_garg_x {
-                        Some(min_max_garg_x)
-                    } else {
-                        None
-                    },
-                );
-                printer::print_eat_and_intercept(&eat, &intercept);
-                ParseResult::Matched
-            }
+                    };
+                    let explode = game::Explode::of_doom(
+                        &game::Doom {
+                            row: doom_row,
+                            col: doom_col,
+                        },
+                        &self.scene,
+                    );
+                    let (garg_rows, mut min_max_garg_x, ice_flag, explode_to_print) =
+                        match extra_args {
+                            [] => (
+                                self.scene.garg_rows_for_doom(doom_row),
+                                self.min_max_garg_x,
+                                self.ice_and_cob_times.is_iced(),
+                                None,
+                            ),
+                            [">", garg_pos_args @ ..] => {
+                                let Ok((garg_rows, min_max_garg_x, ice_flag)) = Parser::parse_garg_pos(
+                                    garg_pos_args,
+                                    &self.scene.garg_rows_for_doom(doom_row),
+                                ) else {
+                                    return ParseResult::Matched;
+                                };
+                                (
+                                    garg_rows,
+                                    min_max_garg_x.unwrap_or(self.min_max_garg_x),
+                                    ice_flag.unwrap_or(self.ice_and_cob_times.is_iced()),
+                                    Some(&explode),
+                                )
+                            }
+                            _ => {
+                                printer::print_too_many_arguments_error();
+                                return ParseResult::Matched;
+                            }
+                        };
+                    let Ok(garg_x_range) = validate_garg_x_range(&mut min_max_garg_x)
+                    else {
+                        return ParseResult::Matched;
+                    };
+                    let (mut eat, mut intercept) = game::judge(
+                        &garg_x_range,
+                        &vec![(explode.clone(), &garg_rows)],
+                        ice_flag,
+                        &self.scene,
+                    );
+                    eat.shift_to_plant_intercept();
+                    intercept.shift_to_plant_intercept();
+                    printer::print_doom_calc_setting(
+                        doom_row,
+                        &garg_rows,
+                        explode_to_print,
+                        if min_max_garg_x != self.min_max_garg_x {
+                            Some(min_max_garg_x)
+                        } else {
+                            None
+                        },
+                    );
+                    printer::print_eat_and_intercept(&eat, &intercept);
+                    ParseResult::Matched
+                }
+            },
             _ => ParseResult::Unmatched,
         }
     }
 
     pub fn parse_hit_or_nohit(&self, input: &str) -> ParseResult {
         match input.split_whitespace().collect::<Vec<&str>>().as_slice() {
-            ["hit", extra_args @ ..] | ["nohit", extra_args @ ..] => {
+            ["hit", all_args @ ..] | ["nohit", all_args @ ..] => {
                 let (min_max_garg_x, cob_dist) = if self.scene != game::Scene::RE {
-                    match extra_args {
+                    match all_args {
                         [] => (self.min_max_garg_x, self.scene.cob_dist(None)),
                         [delay_time] => {
                             let Ok(delay_time) = Parser::parse_delay_time(delay_time)
@@ -454,7 +459,7 @@ impl Parser {
                         }
                     }
                 } else {
-                    match extra_args {
+                    match all_args {
                         [] => {
                             printer::print_error("请提供炮尾所在列");
                             return ParseResult::Matched;
@@ -694,26 +699,28 @@ impl Parser {
 
     pub fn parse_garg_x_range_of_imp_x(&self, input: &str) -> ParseResult {
         match input.split_whitespace().collect::<Vec<&str>>().as_slice() {
-            ["imp"] => {
-                printer::print_error("请提供小鬼x坐标（整数）");
-                ParseResult::Matched
-            }
-            ["imp", imp_x] => {
-                let Ok(imp_x) = imp_x.parse::<i32>() else {
-                    printer::print_error_with_input("小鬼x坐标应为整数", &imp_x);
-                    return ParseResult::Matched;
-                };
-                let Some((min_garg_x, max_garg_x)) = constants::min_max_garg_pos_of_imp_x(imp_x) else {
-                    printer::print_error_with_input(format!("应满足{}≤小鬼x坐标≤{}", constants::MIN_IMP_X, constants::MAX_IMP_X).as_str(), imp_x.to_string().as_str());
-                    return ParseResult::Matched;
-                };
-                println!("巨人x范围: {:.3}~{:.3}", min_garg_x, max_garg_x);
-                ParseResult::Matched
-            }
-            ["imp", ..] => {
-                printer::print_too_many_arguments_error();
-                ParseResult::Matched
-            }
+            ["imp", all_args @ ..] => match all_args {
+                [] => {
+                    printer::print_error("请提供小鬼x坐标（整数）");
+                    ParseResult::Matched
+                }
+                [imp_x] => {
+                    let Ok(imp_x) = imp_x.parse::<i32>() else {
+                        printer::print_error_with_input("小鬼x坐标应为整数", &imp_x);
+                        return ParseResult::Matched;
+                    };
+                    let Some((min_garg_x, max_garg_x)) = constants::min_max_garg_pos_of_imp_x(imp_x) else {
+                        printer::print_error_with_input(format!("应满足{}≤小鬼x坐标≤{}", constants::MIN_IMP_X, constants::MAX_IMP_X).as_str(), imp_x.to_string().as_str());
+                        return ParseResult::Matched;
+                    };
+                    println!("巨人x范围: {:.3}~{:.3}", min_garg_x, max_garg_x);
+                    ParseResult::Matched
+                }
+                _ => {
+                    printer::print_too_many_arguments_error();
+                    ParseResult::Matched
+                }
+            },
             _ => ParseResult::Unmatched,
         }
     }

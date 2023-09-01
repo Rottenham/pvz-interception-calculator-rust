@@ -1,7 +1,9 @@
 [package]
-name = "interception_calculator"
+name = "pvz_interception_calculator"
 version = "0.1.0"
 edition = "2021"
+description = "The Rust rewrite of the original PVZ Interception Calculator that calculates precise imp movement."
+license = "MIT"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
