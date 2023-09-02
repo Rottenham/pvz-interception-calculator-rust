@@ -1,16 +1,13 @@
-use rustyline::error::ReadlineError;
-use rustyline::{DefaultEditor, Result};
-
 use pvz_interception_calculator;
+use rustyline;
 
-fn main() -> Result<()> {
-    let mut rl = DefaultEditor::new()?;
+fn main() -> rustyline::Result<()> {
+    let mut rustyline = rustyline::DefaultEditor::new()?;
     let mut parser = pvz_interception_calculator::parser::Parser::new();
     loop {
-        let readline = rl.readline("\n$ ");
-        match readline {
+        match rustyline.readline("\n$ ") {
             Ok(line) => {
-                rl.add_history_entry(line.as_str()).unwrap();
+                rustyline.add_history_entry(line.as_str()).unwrap();
                 let input = line.trim().to_lowercase();
                 use pvz_interception_calculator::parser::ParseResult;
                 if let ParseResult::Matched = parser.parse_scene(input.as_str()) {
@@ -42,10 +39,8 @@ fn main() -> Result<()> {
                 }
                 println!("未知指令. 输入问号查看帮助.");
             }
-            Err(ReadlineError::Interrupted) => {
-                break;
-            }
-            Err(ReadlineError::Eof) => {
+            Err(rustyline::error::ReadlineError::Interrupted)
+            | Err(rustyline::error::ReadlineError::Eof) => {
                 break;
             }
             Err(err) => {

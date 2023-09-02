@@ -279,7 +279,7 @@ impl Scene {
         }
     }
 
-    fn is_roof(&self) -> bool {
+    pub fn is_roof(&self) -> bool {
         *self == Scene::RE
     }
 }
