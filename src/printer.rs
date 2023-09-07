@@ -206,7 +206,7 @@ pub fn print_nohit_cob_dist(scene: &game::Scene, min_garg_x: i32, cob_dist: &gam
                 ((min_garg_x - cob_dist.hit_same - 1) as f32) / 80.
             );
             println!(
-                "不伤三行: {} ({}列)",
+                "不伤上行: {} ({}列)",
                 min_garg_x - cob_dist.hit_above - 1,
                 ((min_garg_x - cob_dist.hit_above - 1) as f32) / 80.
             );

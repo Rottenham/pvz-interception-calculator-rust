@@ -1046,7 +1046,7 @@ impl Parser {
 const HELLO_TEXT: &str = r#"本程序源码以MIT许可证发布:
 https://github.com/Rottenham/pvz-interception-calculator-rust
 
-欢迎使用拦截计算器v2.0.5.
+欢迎使用拦截计算器v2.0.6.
 当前场合: 后院.
 输入问号查看帮助; 按↑键显示上次输入的指令.
 
