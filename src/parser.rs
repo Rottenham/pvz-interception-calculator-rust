@@ -1,6 +1,13 @@
 use crate::constants;
 use crate::game;
 use crate::printer;
+use dyn_fmt::AsStrFormatExt;
+
+#[cfg(feature = "en")]
+use crate::lang::en::*;
+
+#[cfg(feature = "zh")]
+use crate::lang::zh::*;
 
 const DEFAULT_SCENE: game::Scene = game::Scene::PE;
 const DEFAULT_COB_TIME: i32 = 318;
@@ -9,13 +16,11 @@ const DEFAULT_ROOF_COB_ROW: i32 = 3;
 fn validate_garg_x_range(min_max_garg_x: &mut (f32, f32)) -> Result<game::GargXRange, ()> {
     match game::GargXRange::of_min_max_garg_pos(*min_max_garg_x) {
         game::GargXRange::Cancelled => {
-            printer::print_warning("x坐标<401的巨人不会投掷小鬼, 跳过计算.");
+            printer::print_warning(GARG_X_RANGE_CANCELLED);
             Err(())
         }
         game::GargXRange::Modified { min, max } => {
-            printer::print_warning(
-                format!("x坐标<401的巨人不会投掷小鬼, 改用{}~{}计算.", min, max).as_str(),
-            );
+            printer::print_warning(GARG_X_RANGE_MODIFIED.format(&[min, max]).as_str());
             *min_max_garg_x = (min, max);
             Ok(game::GargXRange::Modified { min, max })
         }
@@ -42,7 +47,7 @@ pub enum ParseResult {
 
 impl Default for Parser {
     fn default() -> Self {
-        println!("{}", HELLO_TEXT);
+        println!("{}", HELLO);
         let scene = DEFAULT_SCENE;
         let ice_and_cob_times =
             game::IceAndCobTimes::of_ice_times_and_cob_time(&[], DEFAULT_COB_TIME).unwrap();
@@ -67,7 +72,7 @@ impl Parser {
 
     pub fn parse_about(&self, input: &str) -> ParseResult {
         if input == "about" {
-            println!("{}", ABOUT_TEXT);
+            println!("{}", ABOUT);
             ParseResult::Matched
         } else {
             ParseResult::Unmatched
@@ -1074,35 +1079,6 @@ impl Parser {
         }
     }
 }
-
-const HELLO_TEXT: &str = r#"本程序源码以MIT许可证发布:
-https://github.com/Rottenham/pvz-interception-calculator-rust
-
-欢迎使用拦截计算器v2.0.6.
-当前场合: 后院.
-输入问号查看帮助; 按↑键显示上次输入的指令.
-
-计算结果默认为【炮激活→炮拦截】的情况.
-若为【植物激活→炮拦截】, 需额外-1; 若为【炮激活→植物拦截】, 需额外+1."#;
-
-const ABOUT_TEXT: &str = r#"MIT 许可证
-
-版权 (c) 2023 Crescendo
-
-特此免费授予任何获得本软件副本和相关文档文件（下称“软件”）的人不受限制地处置该软件的权利，包括不受限制地使用、复制、修改、合并、发布、分发、转授许可和/或出售该软件副本，以及再授权被配发了本软件的人如上的权利，惟须遵守条件如下：
-
-上述版权声明和本许可声明应包含在该软件的所有副本或实质成分中。
-
-本软件是“如此”提供的，没有任何形式的明示或暗示的保证，包括但不限于对适销性、特定用途的适用性和不侵权的保证。在任何情况下，作者或版权持有人都不对任何索赔、损害或其他责任负责，无论这些追责来自合同、侵权或其它行为中，还是产生于、源于或有关于本软件以及本软件的使用或其它处置。
-
-
-请注意，拦截计算器_无法确保_100%的计算精度，其原因包括：
-1. 所用的巨人位移数据并非100%精确；
-2. 所用的仅取坐标极值的拦截区间计算方式并非100%精确。
-
-在极端情况下，计算结果与实际情况可能存在1~2cs左右的偏差，敬请谅解。
-
-除上述在技术上难以解决的问题外，拦截计算器约定在能力所及的范围内尽可能接近游戏情况。"#;
 
 const HELP_TEXT: &str = r#"
 de/pe/re                             设置场合

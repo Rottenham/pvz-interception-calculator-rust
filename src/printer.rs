@@ -1,10 +1,17 @@
 use crate::game;
+use dyn_fmt::AsStrFormatExt;
 use std::io::Write;
 use std::str;
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
+#[cfg(feature = "en")]
+use crate::lang::en::*;
+
+#[cfg(feature = "zh")]
+use crate::lang::zh::*;
+
 pub fn print_warning(str: &str) {
-    print_colored(format!("注意: {}", str).as_str(), Color::Yellow);
+    print_colored(format!("{}: {}", WARNING, str).as_str(), Color::Yellow);
 }
 
 fn print_colored(str: &str, color: Color) {
@@ -21,19 +28,19 @@ fn print_colored(str: &str, color: Color) {
 }
 
 pub fn print_error(error: &str) {
-    println!("输入有误: {error}");
+    println!("{INPUT_ERROR}: {error}");
 }
 
 pub fn print_error_with_input(error: &str, input: &str) {
-    println!("输入有误: {error} (当前为: {input})")
+    println!("{INPUT_ERROR}: {error} ({INPUT_ERROR_GOT}: {input})")
 }
 
 pub fn print_too_many_arguments_error() {
-    println!("提供的参数过多. 输入问号查看帮助.");
+    println!("{INPUT_ERROR_TOO_MANY_ARGUMENTS}");
 }
 
 pub fn print_bad_format_error() {
-    println!("输入格式有误. 输入问号查看帮助.");
+    println!("{INPUT_ERROR_BAD_FORMAT}");
 }
 
 pub fn print_ice_times_and_cob_time(
@@ -46,26 +53,22 @@ pub fn print_ice_times_and_cob_time(
 ) {
     let (min_garg_x, max_garg_x) = min_max_garg_x;
     if max_garg_x as i32 > 817 {
-        print_warning("此时机无法全伤巨人.");
+        print_warning(CANNOT_HIT_ALL_GARG);
     }
     println!(
         "{}: {}{}",
-        if delayed {
-            "延时设定"
-        } else {
-            "当前设定"
-        },
+        if delayed { DELAY_SETTING } else { SETTING },
         match ice_times.as_slice() {
-            [] => "不用冰".to_string(),
-            ice_times => format!("{:?}冰", ice_times),
+            [] => NO_ICE.to_string(),
+            ice_times => format!("{:?}{ICE}", ice_times),
         },
         if delayed {
-            format!(" {}炮生效", cob_time)
+            format!(" {}{COB_EFFECTIVE}", cob_time)
         } else {
-            format!(" {}激活", cob_time)
+            format!(" {}{COB_ACTIVATE}", cob_time)
         }
     );
-    println!("巨人坐标范围: [{:.3}, {:.3}]", min_garg_x, max_garg_x);
+    println!("{GARG_X_RANGE}: [{:.3}, {:.3}]", min_garg_x, max_garg_x);
 }
 
 pub fn print_cob_calc_setting(
@@ -75,27 +78,29 @@ pub fn print_cob_calc_setting(
     cob_col_range: Option<(f32, f32)>,
 ) {
     println!(
-        "计算设定: {}{}{}{}",
+        "{CALCULATION_SETTING}: {}{}{}{}",
         cob_and_garg_rows
             .iter()
-            .map(|(cob, garg_rows)| { format!("{}炮炸{:?}路", cob.row(), garg_rows) })
+            .map(|(cob, garg_rows)| {
+                COB_GARG_ROWS.format(&[cob.row().to_string(), format!("{:?}", garg_rows)])
+            })
             .collect::<Vec<String>>()
             .join(", "),
         if let Some((min_cob_col, max_cob_col)) = cob_col_range {
-            format!(", 落点{}~{}列", min_cob_col, max_cob_col)
+            ", ".to_owned() + &COB_COL_RANGE.format(&[min_cob_col, max_cob_col])
         } else {
             "".to_string()
         },
         if let Some(explode) = explode {
             format!(
-                ", 爆心x={} y={}",
+                ", {EXPLOSION_CENTER}x={} y={}",
                 explode.range.center.x, explode.range.center.y
             )
         } else {
             "".to_string()
         },
         if let Some((min_garg_x, max_garg_x)) = modified_min_max_garg_x {
-            format!(", 巨人x={}~{}", min_garg_x, max_garg_x)
+            format!(", {GARG}x={}~{}", min_garg_x, max_garg_x)
         } else {
             "".to_string()
         }
@@ -109,12 +114,11 @@ pub fn print_doom_calc_setting(
     modified_min_max_garg_x: Option<(f32, f32)>,
 ) {
     println!(
-        "计算设定: {}核炸{:?}路{}{}",
-        doom_row,
-        garg_rows,
+        "{CALCULATION_SETTING}: {}{}{}",
+        DOOM_GARG_ROWS.format(&[doom_row.to_string(), format!("{:?}", garg_rows)]),
         if let Some(explode) = explode {
             format!(
-                ", 爆心x={} y={}",
+                ", {EXPLOSION_CENTER}x={} y={}",
                 explode.range.center.x, explode.range.center.y
             )
         } else {
@@ -122,7 +126,7 @@ pub fn print_doom_calc_setting(
         },
         if let Some(modified_min_max_garg_x) = modified_min_max_garg_x {
             format!(
-                ", 巨人x={}~{}",
+                ", {GARG}x={}~{}",
                 modified_min_max_garg_x.0, modified_min_max_garg_x.1
             )
         } else {
@@ -132,32 +136,33 @@ pub fn print_doom_calc_setting(
 }
 
 pub fn print_eat_and_intercept(eat: &game::Eat, intercept: &game::Intercept) {
-    print!("可拦区间: ");
+    print!("{INTERCEPTABLE_INTERVAL}: ");
     match intercept {
         game::Intercept::Empty | game::Intercept::OnlyHighIndexImp | game::Intercept::Fail => {
-            print_colored("无法拦截", Color::Yellow)
+            print_colored(CANNOT_INTERCEPT, Color::Yellow)
         }
         game::Intercept::Success { min, max } => {
             print!("{}~{}", min, max,);
             match game::unsafe_intercept_interval(eat, intercept) {
                 None => println!(),
-                Some((min, max)) => {
-                    print_colored(format!(" ({}~{}有伤)", min, max).as_str(), Color::Yellow)
-                }
+                Some((min, max)) => print_colored(
+                    format!(" ({}~{}{WILL_CAUSE_HARM})", min, max).as_str(),
+                    Color::Yellow,
+                ),
             }
         }
     };
     println!(
-        "最早啃食: {}",
+        "{EARLIEST_EAT}: {}",
         match &eat {
-            game::Eat::Empty => "不啃食".to_string(),
+            game::Eat::Empty => DOES_NOT_EAT.to_string(),
             game::Eat::OnlyEat(eat) | game::Eat::Both { eat, iceable: _ } => eat.to_string(),
         }
     );
     println!(
-        "最早可冰: {}",
+        "{EARLIEST_ICEABLE}: {}",
         match &eat {
-            game::Eat::Empty | game::Eat::OnlyEat(_) => "不可冰".to_string(),
+            game::Eat::Empty | game::Eat::OnlyEat(_) => NOT_ICEABLE.to_string(),
             game::Eat::Both { eat: _, iceable } => iceable.to_string(),
         }
     );
@@ -167,31 +172,31 @@ pub fn print_hit_cob_dist(scene: &game::Scene, max_garg_x: i32, cob_dist: &game:
     match scene {
         game::Scene::DE | game::Scene::PE => {
             println!(
-                "全伤本行&下行: {} ({}列)",
+                "{HIT_SAME_AND_LOWER}: {} ({})",
                 max_garg_x - cob_dist.hit_same,
-                ((max_garg_x - cob_dist.hit_same) as f32) / 80.
+                COL.format(&[((max_garg_x - cob_dist.hit_same) as f32) / 80.])
             );
             println!(
-                "全伤三行: {} ({}列)",
+                "{HIT_ALL_THREE_ROWS}: {} ({})",
                 max_garg_x - cob_dist.hit_above,
-                ((max_garg_x - cob_dist.hit_above) as f32) / 80.
+                COL.format(&[((max_garg_x - cob_dist.hit_above) as f32) / 80.])
             );
         }
         game::Scene::RE => {
             println!(
-                "全伤上行: {} ({}列)",
+                "{HIT_UPPER_ROW}: {} ({})",
                 max_garg_x - cob_dist.hit_above,
-                ((max_garg_x - cob_dist.hit_above) as f32) / 80.
+                COL.format(&[((max_garg_x - cob_dist.hit_above) as f32) / 80.])
             );
             println!(
-                "全伤本行: {} ({}列)",
+                "{HIT_SAME_ROW}: {} ({})",
                 max_garg_x - cob_dist.hit_same,
-                ((max_garg_x - cob_dist.hit_same) as f32) / 80.
+                COL.format(&[((max_garg_x - cob_dist.hit_same) as f32) / 80.])
             );
             println!(
-                "全伤下行: {} ({}列)",
+                "{HIT_LOWER_ROW}: {} ({})",
                 max_garg_x - cob_dist.hit_below,
-                ((max_garg_x - cob_dist.hit_below) as f32) / 80.
+                COL.format(&[((max_garg_x - cob_dist.hit_below) as f32) / 80.])
             );
         }
     }
@@ -201,31 +206,31 @@ pub fn print_nohit_cob_dist(scene: &game::Scene, min_garg_x: i32, cob_dist: &gam
     match scene {
         game::Scene::DE | game::Scene::PE => {
             println!(
-                "不伤本行&下行: {} ({}列)",
+                "{NOT_HIT_SAME_AND_LOWER}: {} ({})",
                 min_garg_x - cob_dist.hit_same - 1,
-                ((min_garg_x - cob_dist.hit_same - 1) as f32) / 80.
+                COL.format(&[((min_garg_x - cob_dist.hit_same - 1) as f32) / 80.])
             );
             println!(
-                "不伤上行: {} ({}列)",
+                "{NOT_HIT_UPPER_ROW}: {} ({})",
                 min_garg_x - cob_dist.hit_above - 1,
-                ((min_garg_x - cob_dist.hit_above - 1) as f32) / 80.
+                COL.format(&[((min_garg_x - cob_dist.hit_above - 1) as f32) / 80.])
             );
         }
         game::Scene::RE => {
             println!(
-                "不伤上行: {} ({}列)",
+                "{NOT_HIT_UPPER_ROW}: {} ({})",
                 min_garg_x - cob_dist.hit_above - 1,
-                ((min_garg_x - cob_dist.hit_above - 1) as f32) / 80.
+                COL.format(&[((min_garg_x - cob_dist.hit_above - 1) as f32) / 80.])
             );
             println!(
-                "不伤本行: {} ({}列)",
+                "{NOT_HIT_SAME_ROW}: {} ({})",
                 min_garg_x - cob_dist.hit_same - 1,
-                ((min_garg_x - cob_dist.hit_same - 1) as f32) / 80.
+                COL.format(&[((min_garg_x - cob_dist.hit_same - 1) as f32) / 80.])
             );
             println!(
-                "不伤下行: {} ({}列)",
+                "{NOT_HIT_LOWER_ROW}: {} ({})",
                 min_garg_x - cob_dist.hit_below - 1,
-                ((min_garg_x - cob_dist.hit_below - 1) as f32) / 80.
+                COL.format(&[((min_garg_x - cob_dist.hit_below - 1) as f32) / 80.])
             );
         }
     }
