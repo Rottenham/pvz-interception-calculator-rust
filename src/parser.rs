@@ -83,17 +83,17 @@ impl Parser {
         match input {
             "de" | "ne" => {
                 self.scene = game::Scene::DE;
-                println!("已设置为前院场合.");
+                println!("{SET_FRONTYARD}");
                 ParseResult::Matched
             }
             "pe" | "fe" => {
                 self.scene = game::Scene::PE;
-                println!("已设置为后院场合.");
+                println!("{SET_BACKYARD}");
                 ParseResult::Matched
             }
             "re" | "me" => {
                 self.scene = game::Scene::RE;
-                println!("已设置为屋顶场合.");
+                println!("{SET_ROOF}");
                 ParseResult::Matched
             }
             _ => ParseResult::Unmatched,
@@ -167,11 +167,11 @@ impl Parser {
                     if !self.scene.is_roof() {
                         match extra_args {
                             [">", ..] if *command == "delay" => {
-                                printer::print_error("请提供炮落点行、炮落点列");
+                                printer::print_error(NEED_HIT_ROW_HIT_COL);
                                 return ParseResult::Matched;
                             }
                             [_, ">", ..] if *command == "delay" => {
-                                printer::print_error("请提供炮落点列");
+                                printer::print_error(NEED_HIT_COL);
                                 return ParseResult::Matched;
                             }
                             [hit_row, hit_col, ">", garg_pos_args @ ..] if *command == "delay" => {
@@ -204,7 +204,7 @@ impl Parser {
                                 )
                             }
                             [] => {
-                                printer::print_error("请提供炮落点列");
+                                printer::print_error(NEED_HIT_COL);
                                 return ParseResult::Matched;
                             }
                             [hit_col] => {
@@ -240,15 +240,15 @@ impl Parser {
                     } else {
                         match extra_args {
                             [">", ..] if *command == "delay" => {
-                                printer::print_error("请提供炮落点行、炮落点列、炮尾所在列");
+                                printer::print_error(NEED_HIT_ROW_HIT_COL_COB_COL);
                                 return ParseResult::Matched;
                             }
                             [_, ">", ..] if *command == "delay" => {
-                                printer::print_error("请提供炮落点列、炮尾所在列");
+                                printer::print_error(NEED_HIT_COL_COB_COL);
                                 return ParseResult::Matched;
                             }
                             [_, _, ">", ..] if *command == "delay" => {
-                                printer::print_error("请提供炮尾所在列");
+                                printer::print_error(NEED_COB_COL);
                                 return ParseResult::Matched;
                             }
                             [hit_row, hit_col, cob_col, ">", garg_pos_args @ ..]
@@ -286,11 +286,11 @@ impl Parser {
                                 )
                             }
                             [] => {
-                                printer::print_error("请提供炮落点列、炮尾所在行");
+                                printer::print_error(NEED_HIT_COL_COB_COL);
                                 return ParseResult::Matched;
                             }
                             [_] => {
-                                printer::print_error("请提供炮尾所在行");
+                                printer::print_error(NEED_COB_COL);
                                 return ParseResult::Matched;
                             }
                             [hit_col, cob_col] => {
@@ -359,11 +359,11 @@ impl Parser {
         match input.split_whitespace().collect::<Vec<&str>>().as_slice() {
             ["doom", extra_args @ ..] => match extra_args {
                 [] => {
-                    printer::print_error("请提供核所在行、核所在列");
+                    printer::print_error(NEED_DOOM_ROW_DOOM_COL);
                     ParseResult::Matched
                 }
                 [_] => {
-                    printer::print_error("请提供核所在列");
+                    printer::print_error(NEED_DOOM_ROW);
                     ParseResult::Matched
                 }
                 [doom_row, doom_col, garg_pos_args @ ..] => {
@@ -485,7 +485,7 @@ impl Parser {
                 } else {
                     match extra_args {
                         [] => {
-                            printer::print_error("请提供炮尾所在列");
+                            printer::print_error(NEED_COB_COL);
                             return ParseResult::Matched;
                         }
                         [cob_col] => {
@@ -553,11 +553,11 @@ impl Parser {
                 let (cob_list, garg_rows, mut min_max_garg_x, ice_flag) = if !self.scene.is_roof() {
                     match extra_args {
                         [] | [">", ..] => {
-                            printer::print_error("请提供炮落点行、炮落点列范围(逗号分隔)");
+                            printer::print_error(NEED_HIT_ROW_HIT_COL_RANGE);
                             return ParseResult::Matched;
                         }
                         [_] | [_, ">", ..] => {
-                            printer::print_error("请提供炮落点列范围(逗号分隔最小、最大值)");
+                            printer::print_error(NEED_HIT_COL_RANGE);
                             return ParseResult::Matched;
                         }
                         [hit_row, min_max_hit_col, ">", garg_pos_args @ ..] => {
@@ -599,19 +599,15 @@ impl Parser {
                 } else {
                     match extra_args {
                         [] | [">", ..] => {
-                            printer::print_error(
-                                "请提供炮落点行、炮落点列范围(逗号分隔)、炮尾所在列",
-                            );
+                            printer::print_error(NEED_HIT_ROW_HIT_COL_RANGE_COB_COL);
                             return ParseResult::Matched;
                         }
                         [_] | [_, ">", ..] => {
-                            printer::print_error(
-                                "请提供炮落点列范围(逗号分隔最小、最大值)、炮尾所在列",
-                            );
+                            printer::print_error(NEED_HIT_COL_RANGE_COB_COL);
                             return ParseResult::Matched;
                         }
                         [_, _] | [_, _, ">", ..] => {
-                            printer::print_error("请提供炮尾所在列");
+                            printer::print_error(NEED_COB_COL);
                             return ParseResult::Matched;
                         }
                         [hit_row, min_max_hit_col, cob_col, ">", garg_pos_args @ ..] => {
@@ -707,17 +703,13 @@ impl Parser {
                 );
                 match cob_cols.as_mut_slice() {
                     [] => {
-                        println!("无法无伤拦截.");
+                        println!("{CANNOT_INTERCEPT_WITHOUT_HARM}");
                     }
                     cob_cols => {
                         cob_cols.sort_by(|a, b| a.partial_cmp(b).unwrap());
                         println!(
-                            "延迟最大的炮落点: {}列",
-                            cob_cols
-                                .iter()
-                                .map(|cob_col| { format!("{}", cob_col) })
-                                .collect::<Vec<String>>()
-                                .join(", ")
+                            "{HIT_COL_WITH_MAX_DELAY}: {}",
+                            COL.format(&[format!("{:?}", cob_cols)]),
                         );
                         printer::print_eat_and_intercept(&eat, &intercept);
                     }
@@ -732,29 +724,25 @@ impl Parser {
         match input.split_whitespace().collect::<Vec<&str>>().as_slice() {
             ["imp", extra_args @ ..] => match extra_args {
                 [] => {
-                    printer::print_error("请提供小鬼x坐标（整数）");
+                    printer::print_error(NEED_IMP_X_RANGE);
                     ParseResult::Matched
                 }
                 [imp_x] => {
                     let Ok(imp_x) = imp_x.parse::<i32>() else {
-                        printer::print_error_with_input("小鬼x坐标应为整数", imp_x);
+                        printer::print_error_with_input(IMP_X_SHOULD_BE_INTEGER, imp_x);
                         return ParseResult::Matched;
                     };
                     let Some((min_garg_x, max_garg_x)) =
                         constants::min_max_garg_pos_of_imp_x(imp_x)
                     else {
                         printer::print_error_with_input(
-                            format!(
-                                "应满足{}≤小鬼x坐标≤{}",
-                                constants::MIN_IMP_X,
-                                constants::MAX_IMP_X
-                            )
-                            .as_str(),
+                            &IMP_X_SHOULD_BE_IN_RANGE
+                                .format(&[constants::MIN_IMP_X, constants::MAX_IMP_X]),
                             imp_x.to_string().as_str(),
                         );
                         return ParseResult::Matched;
                     };
-                    println!("巨人x范围: {:.3}~{:.3}", min_garg_x, max_garg_x);
+                    println!("{GARG_X_RANGE}: {:.3}~{:.3}", min_garg_x, max_garg_x);
                     ParseResult::Matched
                 }
                 _ => {
@@ -773,7 +761,10 @@ impl Parser {
             .collect::<Result<Vec<i32>, _>>()
         {
             Err(_) => {
-                printer::print_error_with_input("用冰时机应为整数", ice_times.join(" ").as_str());
+                printer::print_error_with_input(
+                    ICE_TIMES_SHOULD_BE_INTEGER,
+                    format!("{:?}", ice_times).as_str(),
+                );
                 Err(())
             }
             Ok(ice_times) => Ok(ice_times),
@@ -783,11 +774,14 @@ impl Parser {
     fn parse_cob_time(cob_time: &&str) -> Result<i32, ()> {
         match cob_time.parse::<i32>() {
             Err(_) => {
-                printer::print_error_with_input("激活时机应为整数", cob_time);
+                printer::print_error_with_input(COB_TIME_SHOULD_BE_INTEGER, cob_time);
                 Err(())
             }
             Ok(cob_time) if cob_time < 0 => {
-                printer::print_error_with_input("激活时机应≥0", cob_time.to_string().as_str());
+                printer::print_error_with_input(
+                    COB_TIME_SHOULD_BE_NON_NEGATIVE,
+                    cob_time.to_string().as_str(),
+                );
                 Err(())
             }
             Ok(cob_time) => Ok(cob_time),
@@ -797,7 +791,7 @@ impl Parser {
     fn parse_delay_time(delay_time: &&str) -> Result<i32, ()> {
         match delay_time.parse::<i32>() {
             Err(_) => {
-                printer::print_error_with_input("炮生效延时应为整数", delay_time);
+                printer::print_error_with_input(DELAY_TIME_SHOULD_BE_INTEGER, delay_time);
                 Err(())
             }
             Ok(delay) => Ok(delay),
@@ -807,12 +801,12 @@ impl Parser {
     fn parse_hit_row(hit_row: &&str, valid_hit_rows: &[i32]) -> Result<i32, ()> {
         match hit_row.parse::<i32>() {
             Err(_) => {
-                printer::print_error_with_input("炮落点行应为整数", hit_row);
+                printer::print_error_with_input(HIT_ROW_SHOULD_BE_INTEGER, hit_row);
                 Err(())
             }
             Ok(hit_row) if !(valid_hit_rows.contains(&hit_row)) => {
                 printer::print_error_with_input(
-                    format!("炮落点行超出范围{:?}", valid_hit_rows).as_str(),
+                    &HIT_ROW_OUT_OF_RANGE.format(&[format!("{:?}", valid_hit_rows)]),
                     hit_row.to_string().as_str(),
                 );
                 Err(())
@@ -824,12 +818,12 @@ impl Parser {
     fn parse_hit_col(hit_col: &&str) -> Result<f32, ()> {
         match hit_col.parse::<f32>() {
             Err(_) => {
-                printer::print_error_with_input("炮落点列应为数字", hit_col);
+                printer::print_error_with_input(HIT_COL_SHOULD_BE_NUMBER, hit_col);
                 Err(())
             }
             Ok(hit_col) if !((0. ..10.).contains(&hit_col)) => {
                 printer::print_error_with_input(
-                    "应满足0≤炮落点列<10",
+                    HIT_COL_SHOULD_BE_IN_RANGE,
                     hit_col.to_string().as_str(),
                 );
                 Err(())
@@ -838,11 +832,7 @@ impl Parser {
                 None => Ok(hit_col),
                 Some(corrected_hit_col) => {
                     printer::print_warning(
-                        format!(
-                            "当前落点列{}×80不是整数, 改用{}列计算.",
-                            hit_col, corrected_hit_col
-                        )
-                        .as_str(),
+                        &HIT_COL_TIMES_EIGHTY_NOT_INTEGER.format(&[hit_col, corrected_hit_col]),
                     );
                     Ok(corrected_hit_col)
                 }
@@ -858,11 +848,11 @@ impl Parser {
             .as_slice()
         {
             [] => {
-                printer::print_error("请提供炮落点列最小值、最大值");
+                printer::print_error(NEED_MIN_MAX_HIT_COL);
                 Err(())
             }
             [_] => {
-                printer::print_error("请提供炮落点列最大值");
+                printer::print_error(NEED_MAX_HIT_COL);
                 Err(())
             }
             [min_hit_col, max_hit_col] => {
@@ -876,7 +866,7 @@ impl Parser {
                         let max_hit_pixel = (max_hit_col * 80.).round() as i32;
                         if min_hit_pixel > max_hit_pixel {
                             printer::print_error_with_input(
-                                "应满足炮落点列最小值≤最大值",
+                                MIN_COL_SHOULD_BE_SMALLER_THAN_MAX_COL,
                                 format!("{}, {}", min_hit_col, max_hit_col).as_str(),
                             );
                             return Err(());
@@ -886,7 +876,7 @@ impl Parser {
                 }
             }
             _ => {
-                printer::print_error_with_input("参数过多", min_max_hit_col);
+                printer::print_too_many_arguments_error();
                 Err(())
             }
         }
@@ -895,12 +885,12 @@ impl Parser {
     fn parse_cob_col(cob_col: &&str) -> Result<i32, ()> {
         match cob_col.parse::<i32>() {
             Err(_) => {
-                printer::print_error_with_input("炮尾所在列应为整数", cob_col);
+                printer::print_error_with_input(COB_COL_SHOULD_BE_INTEGER, cob_col);
                 Err(())
             }
             Ok(cob_col) if !((1..=8).contains(&cob_col)) => {
                 printer::print_error_with_input(
-                    "应满足1≤炮尾所在列≤8",
+                    COB_COL_SHOULD_BE_IN_RANGE,
                     cob_col.to_string().as_str(),
                 );
                 Err(())
@@ -912,12 +902,12 @@ impl Parser {
     fn parse_doom_row(doom_row: &&str, valid_doom_rows: &[i32]) -> Result<i32, ()> {
         match doom_row.parse::<i32>() {
             Err(_) => {
-                printer::print_error_with_input("核所在行应为整数", doom_row);
+                printer::print_error_with_input(DOOM_ROW_SHOULD_BE_INTEGER, doom_row);
                 Err(())
             }
             Ok(doom_row) if !(valid_doom_rows.contains(&doom_row)) => {
                 printer::print_error_with_input(
-                    format!("核所在行超出范围{:?}", valid_doom_rows).as_str(),
+                    &DOOM_ROW_OUT_OF_RANGE.format(&[format!("{:?}", valid_doom_rows)]),
                     doom_row.to_string().as_str(),
                 );
                 Err(())
@@ -929,12 +919,12 @@ impl Parser {
     fn parse_doom_col(doom_col: &&str) -> Result<i32, ()> {
         match doom_col.parse::<i32>() {
             Err(_) => {
-                printer::print_error_with_input("核所在列应为整数", doom_col);
+                printer::print_error_with_input(DOOM_COL_SHOULD_BE_INTEGER, doom_col);
                 Err(())
             }
             Ok(doom_col) if !((1..=9).contains(&doom_col)) => {
                 printer::print_error_with_input(
-                    "应满足1≤核所在列≤9",
+                    DOOM_COL_SHOULD_BE_IN_RANGE,
                     doom_col.to_string().as_str(),
                 );
                 Err(())
@@ -949,7 +939,7 @@ impl Parser {
     ) -> Result<ParsedGargPos, ()> {
         let (garg_rows, min_max_garg_x, ice_flag) = match garg_pos_args {
             [] => {
-                printer::print_error("请提供巨人所在行、x坐标范围(可选)、速度模式(u/i, 可选)");
+                printer::print_error(NEED_GARG_ROWS_X_RANGE_ICE_FLAG);
                 (Err(()), Err(()), Err(()))
             }
             [garg_rows] => (
@@ -990,7 +980,7 @@ impl Parser {
             .collect::<Result<Vec<i32>, _>>()
         {
             Err(_) => {
-                printer::print_error_with_input("巨人所在行应为逗号分隔的整数", garg_rows);
+                printer::print_error_with_input(GARG_ROWS_SHOULD_BE_INTEGER, garg_rows);
                 Err(())
             }
             Ok(garg_rows) => {
@@ -1001,7 +991,7 @@ impl Parser {
                     .collect::<Vec<i32>>();
                 if filtered_garg_rows.is_empty() {
                     printer::print_error_with_input(
-                        format!("巨人所在行均超出范围{:?}", valid_garg_rows).as_str(),
+                        &GARG_ROWS_ALL_OUT_OF_RANGE.format(&[format!("{:?}", valid_garg_rows)]),
                         format!("{:?}", garg_rows).as_str(),
                     );
                     Err(())
@@ -1020,40 +1010,42 @@ impl Parser {
             .as_slice()
         {
             [] => {
-                printer::print_error("请提供巨人x坐标最小值、最大值");
+                printer::print_error(NEED_MIN_MAX_GARG_X);
                 Err(())
             }
             [_] => {
-                printer::print_error("请提供巨人x坐标最大值");
+                printer::print_error(NEED_MAX_GARG_X);
                 Err(())
             }
             [min_garg_x, max_garg_x] => {
                 match (min_garg_x.parse::<f32>(), max_garg_x.parse::<f32>()) {
                     (Err(_), _) => {
-                        printer::print_error_with_input("巨人x坐标最小值应为数字", min_garg_x);
+                        printer::print_error_with_input(MIN_GARG_X_SHOULD_BE_NUMBER, min_garg_x);
                         Err(())
                     }
                     (_, Err(_)) => {
-                        printer::print_error_with_input("巨人x坐标最大值应为数字", max_garg_x);
+                        printer::print_error_with_input(MAX_GARG_X_SHOULD_BE_NUMBER, max_garg_x);
                         Err(())
                     }
                     (Ok(min_garg_x), Ok(max_garg_x)) if min_garg_x > max_garg_x => {
                         printer::print_error_with_input(
-                            "应满足巨人x坐标最小值≤最大值",
+                            MIN_GARG_X_SHOULD_BE_SMALLER_THAN_MAX_GARG_X,
                             format!("{}, {}", min_garg_x, max_garg_x).as_str(),
                         );
                         Err(())
                     }
                     (Ok(min_garg_x), _) if min_garg_x <= game::MIN_GARG_X => {
                         printer::print_error_with_input(
-                            format!("应满足巨人x坐标最小值>{}", game::MIN_GARG_X).as_str(),
+                            &MIN_GARG_X_SHOULD_BE_LARGER_THAN_LOWER_BOUND
+                                .format(&[game::MIN_GARG_X]),
                             format!("{}", min_garg_x).as_str(),
                         );
                         Err(())
                     }
                     (_, Ok(max_garg_x)) if max_garg_x > game::MAX_GARG_X => {
                         printer::print_error_with_input(
-                            format!("应满足巨人x坐标最大值≤{}", game::MAX_GARG_X).as_str(),
+                            &MAX_GARG_X_SHOULD_BE_SMALLER_THAN_UPPER_BOUND
+                                .format(&[game::MAX_GARG_X]),
                             format!("{}", max_garg_x).as_str(),
                         );
                         Err(())
@@ -1062,19 +1054,19 @@ impl Parser {
                 }
             }
             _ => {
-                printer::print_error_with_input("参数过多", min_max_garg_x);
+                printer::print_too_many_arguments_error();
                 Err(())
             }
         }
     }
 
-    fn parse_ice_flag(ice_flag: &&str) -> Result<bool, ()> {
-        if *ice_flag == "u" {
+    fn parse_ice_flag(ice_mode: &&str) -> Result<bool, ()> {
+        if *ice_mode == "u" {
             Ok(false)
-        } else if *ice_flag == "i" {
+        } else if *ice_mode == "i" {
             Ok(true)
         } else {
-            printer::print_error_with_input("计算模式应为u/i(原速/减速)", ice_flag);
+            printer::print_error_with_input(ICE_FLAG_SHOULD_BE_U_OR_I, ice_mode);
             Err(())
         }
     }

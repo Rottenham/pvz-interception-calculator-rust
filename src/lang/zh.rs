@@ -1,12 +1,95 @@
-pub const CANNOT_HIT_ALL_GARG: &str = "此时机无法全伤巨人.";
-
+// validate_garg_x_range
 pub const GARG_X_RANGE_CANCELLED: &str = "x坐标<401的巨人不会投掷小鬼, 跳过计算.";
-
 pub const GARG_X_RANGE_MODIFIED: &str = "x坐标<401的巨人不会投掷小鬼, 改用{}~{}计算.";
+
+// parse_scene
+pub const SET_FRONTYARD: &str = "已设置为前院场合.";
+pub const SET_BACKYARD: &str = "已设置为后院场合.";
+pub const SET_ROOF: &str = "已设置为屋顶场合.";
+
+// parse_delay
+pub const NEED_HIT_ROW_HIT_COL: &str = "请提供炮落点行、炮落点列";
+pub const NEED_HIT_COL: &str = "请提供炮落点列";
+pub const NEED_HIT_ROW_HIT_COL_COB_COL: &str = "请提供炮落点行、炮落点列、炮尾所在列";
+pub const NEED_HIT_COL_COB_COL: &str = "请提供炮落点列、炮尾所在列";
+pub const NEED_COB_COL: &str = "请提供炮尾所在列";
+
+// parse_doom
+pub const NEED_DOOM_ROW_DOOM_COL: &str = "请提供核所在行、核所在列";
+pub const NEED_DOOM_ROW: &str = "请提供核所在列";
+
+// parse_find_max_delay
+pub const NEED_HIT_ROW_HIT_COL_RANGE: &str = "请提供炮落点行、炮落点列范围(逗号分隔)";
+pub const NEED_HIT_COL_RANGE: &str = "请提供炮落点列范围(逗号分隔最小、最大值)";
+pub const NEED_HIT_ROW_HIT_COL_RANGE_COB_COL: &str =
+    "请提供炮落点行、炮落点列范围(逗号分隔)、炮尾所在列";
+pub const NEED_HIT_COL_RANGE_COB_COL: &str = "请提供炮落点列范围(逗号分隔最小、最大值)、炮尾所在列";
+pub const CANNOT_INTERCEPT_WITHOUT_HARM: &str = "无法无伤拦截.";
+pub const HIT_COL_WITH_MAX_DELAY: &str = "延迟最大的炮落点";
+
+// parse_garg_x_range_of_imp_x
+pub const NEED_IMP_X_RANGE: &str = "请提供小鬼x坐标(整数)";
+pub const IMP_X_SHOULD_BE_INTEGER: &str = "小鬼x坐标应为整数";
+pub const IMP_X_SHOULD_BE_IN_RANGE: &str = "应满足{}≤小鬼x坐标≤{}";
+
+// parse_ice_times
+pub const ICE_TIMES_SHOULD_BE_INTEGER: &str = "用冰时机应为整数";
+
+// parse_cob_time
+pub const COB_TIME_SHOULD_BE_INTEGER: &str = "激活时机应为整数";
+pub const COB_TIME_SHOULD_BE_NON_NEGATIVE: &str = "激活时机应≥0";
+
+// parse_delay_time
+pub const DELAY_TIME_SHOULD_BE_INTEGER: &str = "炮生效延时应为整数";
+
+// parse hit row
+pub const HIT_ROW_SHOULD_BE_INTEGER: &str = "炮落点行应为整数";
+pub const HIT_ROW_OUT_OF_RANGE: &str = "炮落点行超出范围{}";
+
+// parse hit col
+pub const HIT_COL_SHOULD_BE_NUMBER: &str = "炮落点列应为数字";
+pub const HIT_COL_SHOULD_BE_IN_RANGE: &str = "应满足0≤炮落点列<10";
+pub const HIT_COL_TIMES_EIGHTY_NOT_INTEGER: &str = "当前落点列{}×80不是整数, 改用{}列计算.";
+
+// parse_min_max_hit_col
+pub const NEED_MIN_MAX_HIT_COL: &str = "请提供炮落点列最小值、最大值";
+pub const NEED_MAX_HIT_COL: &str = "请提供炮落点列最大值";
+pub const MIN_COL_SHOULD_BE_SMALLER_THAN_MAX_COL: &str = "应满足炮落点列最小值≤最大值";
+
+// parse_cob_col
+pub const COB_COL_SHOULD_BE_INTEGER: &str = "炮尾所在列应为整数";
+pub const COB_COL_SHOULD_BE_IN_RANGE: &str = "应满足1≤炮尾所在列≤8";
+
+// parse_doom_row
+pub const DOOM_ROW_SHOULD_BE_INTEGER: &str = "核所在行应为整数";
+pub const DOOM_ROW_OUT_OF_RANGE: &str = "核所在行超出范围{}";
+
+// parse_doom_col
+pub const DOOM_COL_SHOULD_BE_INTEGER: &str = "核所在列应为整数";
+pub const DOOM_COL_SHOULD_BE_IN_RANGE: &str = "应满足1≤核所在列≤9";
+
+// parse_garg_pos
+pub const NEED_GARG_ROWS_X_RANGE_ICE_FLAG: &str =
+    "请提供巨人所在行、x坐标范围(可选)、速度模式(u/i, 可选)";
+pub const GARG_ROWS_SHOULD_BE_INTEGER: &str = "巨人所在行应为逗号分隔的整数";
+pub const GARG_ROWS_ALL_OUT_OF_RANGE: &str = "巨人所在行均超出范围{}";
+
+// parse_min_max_garg_x
+pub const NEED_MIN_MAX_GARG_X: &str = "请提供巨人x坐标最小值、最大值";
+pub const NEED_MAX_GARG_X: &str = "请提供巨人x坐标最大值";
+pub const MIN_GARG_X_SHOULD_BE_NUMBER: &str = "巨人x坐标最小值应为数字";
+pub const MAX_GARG_X_SHOULD_BE_NUMBER: &str = "巨人x坐标最大值应为数字";
+pub const MIN_GARG_X_SHOULD_BE_SMALLER_THAN_MAX_GARG_X: &str = "应满足巨人x坐标最小值≤最大值";
+pub const MIN_GARG_X_SHOULD_BE_LARGER_THAN_LOWER_BOUND: &str = "应满足巨人x坐标最小值>{}";
+pub const MAX_GARG_X_SHOULD_BE_SMALLER_THAN_UPPER_BOUND: &str = "应满足巨人x坐标最大值≤{}";
+
+// parse_ice_flag
+pub const ICE_FLAG_SHOULD_BE_U_OR_I: &str = "计算模式应为u/i(原速/减速)";
 
 // print_ice_times_and_cob_time
 pub const DELAY_SETTING: &str = "延时设定";
 pub const SETTING: &str = "当前设定";
+pub const CANNOT_HIT_ALL_GARG: &str = "此时机无法全伤巨人.";
 pub const NO_ICE: &str = "不用冰";
 pub const ICE: &str = "冰";
 pub const COB_EFFECTIVE: &str = "炮生效";
