@@ -1,5 +1,12 @@
 use crate::constants;
+use dyn_fmt::AsStrFormatExt;
 use std::{cmp, ops::Add};
+
+#[cfg(feature = "en")]
+use crate::lang::en::*;
+
+#[cfg(feature = "zh")]
+use crate::lang::zh::*;
 
 const GRAVITY: Vec2 = Vec2 { x: 0., y: -0.05 };
 const COL_WIDTH: i32 = 80;
@@ -219,7 +226,7 @@ impl Scene {
             }
             Scene::PE => DelayMode::Delay2,
             Scene::RE => {
-                if hit_col <= 5. || cob_col.expect("需指定炮尾所在列.") <= 4 {
+                if hit_col <= 5. || cob_col.expect(NEED_COB_COL) <= 4 {
                     DelayMode::Delay3
                 } else {
                     DelayMode::Delay2
@@ -256,8 +263,8 @@ impl Scene {
             Scene::DE => &DE_COB_DIST,
             Scene::PE => &PE_COB_DIST,
             Scene::RE => RE_COB_DIST
-                .get((cob_col.expect("需指定炮尾所在列.") - 1) as usize)
-                .expect("没有对应该炮尾所在列的炮距数据."),
+                .get((cob_col.expect(NEED_COB_COL) - 1) as usize)
+                .unwrap(),
         }
     }
 
@@ -763,7 +770,9 @@ impl IceAndCobTimes {
         cob_time: i32,
     ) -> Result<IceAndCobTimes, String> {
         if cob_time < 0 {
-            return Err(format!("炮生效时间应≥0 (当前为: {cob_time})"));
+            return Err(format!(
+                "{COB_TIME_SHOULD_BE_NON_NEGATIVE} ({INPUT_ERROR_GOT}: {cob_time})"
+            ));
         }
         let mut ice_times = ice_times
             .iter()
@@ -796,18 +805,16 @@ pub fn min_max_garg_x(
         constants::garg_slow_of_half_ticks(min_half_ticks),
         constants::garg_fast_of_half_ticks(max_half_ticks),
     ) {
-        (None, _) => Err(format!(
-            "巨人最短行走时间[{}]超出数据范围({}~{})",
-            min_half_ticks as f32 / 2.,
-            0,
-            constants::GARG_DATA_SIZE - 1
-        )),
-        (_, None) => Err(format!(
-            "巨人最长行走时间[{}]超出数据范围({}~{})",
-            max_half_ticks as f32 / 2.,
-            0,
-            constants::GARG_DATA_SIZE - 1
-        )),
+        (None, _) => Err(GARG_MIN_WALK_OUT_OF_RANGE.format(&[
+            (min_half_ticks as f32 / 2.).to_string(),
+            0.to_string(),
+            (constants::GARG_DATA_SIZE - 1).to_string(),
+        ])),
+        (_, None) => Err(GARG_MAX_WALK_OUT_OF_RANGE.format(&[
+            (max_half_ticks as f32 / 2.).to_string(),
+            0.to_string(),
+            (constants::GARG_DATA_SIZE - 1).to_string(),
+        ])),
         (Some(min_walk), Some(max_walk)) => {
             Ok((MIN_GARG_START_POS - max_walk, MAX_GARG_START_POS - min_walk))
         }
@@ -851,11 +858,11 @@ fn garg_walk_in_half_ticks(
                 (walk - uniced_walk) + uniced_walk * 2
             };
             match (new_tick, old_tick) {
-                (Tick::Start(_), _) => panic!("Tick::Start只能是被减数"),
+                (Tick::Start(_), _) => panic!("Tick::Start can only be minuend."),
                 (Tick::Ice { time: _, length: _ }, Tick::Cob(_)) => {
-                    panic!("Tick::Cob须晚于Tick::Ice")
+                    panic!("Tick::Cob must be later than Tick::Ice.")
                 }
-                (Tick::Cob(_), Tick::Cob(_)) => panic!("Tick::Cob只能存在一个"),
+                (Tick::Cob(_), Tick::Cob(_)) => panic!("Tick::Cob must be unique."),
                 (
                     Tick::Ice {
                         time: new_time,
