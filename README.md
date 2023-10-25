@@ -1,4 +1,6 @@
-# PVZ 拦截计算器 Rust 版
+# PVZ Interception Calculator in Rust
+
+[English](doc/README_en.md) | [简体中文](./README.md)
 
 使用 Rust 重写原先的拦截计算器，提高运行效率，并修正各种问题。
 
