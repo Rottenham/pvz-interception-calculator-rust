@@ -4,7 +4,7 @@
 
 A rewrite of the original Interception Calculator in rust with various issues fixed.
 
-## Commands
+## How to use
 | Command | Usage |
 | -------- | ----------- |
 | de/pe/re   |             Set scene |
