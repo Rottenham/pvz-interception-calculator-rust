@@ -1,3 +1,9 @@
+#[cfg(feature = "en")]
+use pvz_interception_calculator::lang::en::*;
+
+#[cfg(feature = "zh")]
+use pvz_interception_calculator::lang::zh::*;
+
 fn main() -> rustyline::Result<()> {
     let mut rustyline = rustyline::DefaultEditor::new()?;
     let mut parser = pvz_interception_calculator::parser::Parser::default();
@@ -34,14 +40,14 @@ fn main() -> rustyline::Result<()> {
                 if let ParseResult::Matched = parser.parse_help(input.as_str()) {
                     continue;
                 }
-                println!("未知指令. 输入问号查看帮助.");
+                println!("{UNKNOWN_COMMAND}");
             }
             Err(rustyline::error::ReadlineError::Interrupted)
             | Err(rustyline::error::ReadlineError::Eof) => {
                 break;
             }
             Err(err) => {
-                println!("出现错误: {:?}", err);
+                println!("{ERROR}: {:?}", err);
                 break;
             }
         }

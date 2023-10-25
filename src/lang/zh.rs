@@ -82,3 +82,7 @@ https://github.com/Rottenham/pvz-interception-calculator-rust
 
 计算结果默认为【炮激活→炮拦截】的情况.
 若为【植物激活→炮拦截】, 需额外-1; 若为【炮激活→植物拦截】, 需额外+1."#;
+
+// main.rs
+pub const UNKNOWN_COMMAND: &str = "未知指令. 输入问号查看帮助.";
+pub const ERROR: &str = "出现错误";

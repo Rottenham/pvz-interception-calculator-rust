@@ -85,3 +85,7 @@ Type '?' for help; press ↑ to show previous commands.
 Calculation results are based on [cob activation -> cob interception] by default.
 For [ash activation -> cob interception], subtract 1 from the results.
 For [cob activation -> ash interception], add 1 to the results. "#;
+
+// main.rs
+pub const UNKNOWN_COMMAND: &str = "Unknown command. Type '?' for help.";
+pub const ERROR: &str = "Error";
