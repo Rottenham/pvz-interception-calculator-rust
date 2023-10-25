@@ -219,14 +219,10 @@ impl Scene {
             }
             Scene::PE => DelayMode::Delay2,
             Scene::RE => {
-                if hit_col <= 5. {
+                if hit_col <= 5. || cob_col.expect("需指定炮尾所在列.") <= 4 {
                     DelayMode::Delay3
                 } else {
-                    if cob_col.expect("需指定炮尾所在列.") <= 4 {
-                        DelayMode::Delay3
-                    } else {
-                        DelayMode::Delay2
-                    }
+                    DelayMode::Delay2
                 }
             }
         }
@@ -795,7 +791,7 @@ pub fn min_max_garg_x(
         cob_time,
     }: &IceAndCobTimes,
 ) -> Result<(f32, f32), String> {
-    let (min_half_ticks, max_half_ticks) = min_max_garg_walk_in_half_ticks(&ice_times, *cob_time);
+    let (min_half_ticks, max_half_ticks) = min_max_garg_walk_in_half_ticks(ice_times, *cob_time);
     match (
         constants::garg_slow_of_half_ticks(min_half_ticks),
         constants::garg_fast_of_half_ticks(max_half_ticks),

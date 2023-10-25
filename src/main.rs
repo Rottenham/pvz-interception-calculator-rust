@@ -1,9 +1,6 @@
-use pvz_interception_calculator;
-use rustyline;
-
 fn main() -> rustyline::Result<()> {
     let mut rustyline = rustyline::DefaultEditor::new()?;
-    let mut parser = pvz_interception_calculator::parser::Parser::new();
+    let mut parser = pvz_interception_calculator::parser::Parser::default();
     loop {
         match rustyline.readline("\n$ ") {
             Ok(line) => {

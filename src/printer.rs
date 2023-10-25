@@ -13,11 +13,11 @@ fn print_colored(str: &str, color: Color) {
         write!(stdout, "{}", str)
     };
     let mut stdout = StandardStream::stdout(ColorChoice::Always);
-    if let Err(_) = print_colored_internal(&mut stdout) {
+    if print_colored_internal(&mut stdout).is_err() {
         println!("{}", str); // 如果出现错误，改用普通打印
     }
     stdout.reset().unwrap_or_default();
-    println!("");
+    println!();
 }
 
 pub fn print_error(error: &str) {
@@ -139,8 +139,8 @@ pub fn print_eat_and_intercept(eat: &game::Eat, intercept: &game::Intercept) {
         }
         game::Intercept::Success { min, max } => {
             print!("{}~{}", min, max,);
-            match game::unsafe_intercept_interval(&eat, &intercept) {
-                None => println!(""),
+            match game::unsafe_intercept_interval(eat, intercept) {
+                None => println!(),
                 Some((min, max)) => {
                     print_colored(format!(" ({}~{}有伤)", min, max).as_str(), Color::Yellow)
                 }
