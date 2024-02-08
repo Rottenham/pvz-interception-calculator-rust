@@ -902,14 +902,14 @@ fn garg_walk_in_half_ticks(
             Some(prev_ice_time) => ice_time - prev_ice_time < ICE_SLOW_TOTAL_TIME,
         };
         ticks.push(Tick::Ice {
-            time: ice_time,
+            time: ice_time + 1,
             length: if iced {
                 ice_length_for_iced
             } else {
                 ice_length_for_uniced
             },
         });
-        prev_ice_time = Some(ice_time);
+        prev_ice_time = Some(ice_time + 1);
     }
     ticks.push(Tick::Cob(cob_time));
     ticks
@@ -1091,25 +1091,25 @@ mod tests {
     fn test_min_max_walk() {
         let (min, max) = min_max_garg_walk_in_half_ticks(&(Vec::new()), 10);
         assert_eq!((min, max), (20, 20));
-        let (min, max) = min_max_garg_walk_in_half_ticks(&(vec![1]), 0);
+        let (min, max) = min_max_garg_walk_in_half_ticks(&(vec![0]), 0);
         assert_eq!((min, max), (0, 0));
-        let (min, max) = min_max_garg_walk_in_half_ticks(&(vec![1]), 400);
+        let (min, max) = min_max_garg_walk_in_half_ticks(&(vec![0]), 400);
         assert_eq!((min, max), (0, 1));
-        let (min, max) = min_max_garg_walk_in_half_ticks(&(vec![1]), 500);
+        let (min, max) = min_max_garg_walk_in_half_ticks(&(vec![0]), 500);
         assert_eq!((min, max), (0, 101));
-        let (min, max) = min_max_garg_walk_in_half_ticks(&(vec![1]), 600);
+        let (min, max) = min_max_garg_walk_in_half_ticks(&(vec![0]), 600);
         assert_eq!((min, max), (1, 201));
-        let (min, max) = min_max_garg_walk_in_half_ticks(&(vec![1]), 1999);
+        let (min, max) = min_max_garg_walk_in_half_ticks(&(vec![0]), 1999);
         assert_eq!((min, max), (1400, 1600));
-        let (min, max) = min_max_garg_walk_in_half_ticks(&(vec![1]), 2000);
+        let (min, max) = min_max_garg_walk_in_half_ticks(&(vec![0]), 2000);
         assert_eq!((min, max), (1402, 1602));
-        let (min, max) = min_max_garg_walk_in_half_ticks(&(vec![1, 2]), 301);
+        let (min, max) = min_max_garg_walk_in_half_ticks(&(vec![0, 1]), 301);
         assert_eq!((min, max), (0, 1));
-        let (min, max) = min_max_garg_walk_in_half_ticks(&(vec![1, 2]), 501);
+        let (min, max) = min_max_garg_walk_in_half_ticks(&(vec![0, 1]), 501);
         assert_eq!((min, max), (101, 201));
-        let (min, max) = min_max_garg_walk_in_half_ticks(&(vec![1, 500]), 1000);
+        let (min, max) = min_max_garg_walk_in_half_ticks(&(vec![0, 499]), 1000);
         assert_eq!((min, max), (102, 302));
-        let (min, max) = min_max_garg_walk_in_half_ticks(&(vec![1, 2500]), 3000);
+        let (min, max) = min_max_garg_walk_in_half_ticks(&(vec![0, 2499]), 3000);
         assert_eq!((min, max), (2400, 2702));
     }
 }
