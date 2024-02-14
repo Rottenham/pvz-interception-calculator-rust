@@ -598,6 +598,17 @@ impl Intercept {
             }
         }
     }
+
+    pub fn exclude(&mut self, eat: &Eat) {
+        if let Eat::OnlyEat(eat) | Eat::Both { eat, iceable: _ } = eat {
+            if let Intercept::Success { min, max } = self {
+                *self = Intercept::Success {
+                    min: cmp::min(*min, eat - 1),
+                    max: cmp::min(*max, eat - 1),
+                }
+            }
+        }
+    }
 }
 
 pub enum GargXRange {
@@ -677,8 +688,18 @@ fn judge_internal(
     roof: bool,
     explode: &Explode,
 ) -> (Eat, Intercept) {
-    if garg_pos.x < GARG_THROW_IMP_THRES || (garg_pos.x < 501. && rnd != 0) {
+    if garg_pos.x < GARG_THROW_IMP_THRES {
         return (Eat::Empty, Intercept::Empty);
+    }
+    let mut imp_velocity_y = garg_pos.x - 360. - (if roof { 180. } else { 0. });
+    if imp_velocity_y >= 40. {
+        if imp_velocity_y > 140. {
+            imp_velocity_y -= rnd as f32;
+        } else if rnd != 0 {
+            return (Eat::Empty, Intercept::Empty);
+        }
+    } else {
+        imp_velocity_y = 40.;
     }
     let eat_loop = if iced { 8 } else { 4 };
     let imp_spawn_time = if iced { 210 } else { 105 };
@@ -700,7 +721,7 @@ fn judge_internal(
         },
         velocity: Vec2 {
             x: -3.,
-            y: (garg_pos.x - 360. - (if roof { 180. } else { 0. }) - rnd as f32) / 120.,
+            y: imp_velocity_y / 3. * 0.5 * 0.05000000074505806,
         },
         exist_time: 0,
     };
@@ -714,7 +735,7 @@ fn judge_internal(
                 imp.position.x += imp.velocity.x;
                 imp.position.h += imp.velocity.y;
                 imp.position.y_shift = y_shift(imp.position.x, roof);
-                if ((imp.position.h + imp.position.y_shift) as i32) < 0 {
+                if imp.position.y_shift + imp.position.h < 0. {
                     imp.position.h = 0.;
                     imp.state = ImpState::S72 {
                         countdown: (if iced { 50 } else { 25 }),
@@ -756,6 +777,7 @@ fn judge_internal(
         }
         intercept.update(tick, &imp.position, explode);
     }
+    intercept.exclude(&eat);
     (eat, intercept)
 }
 
@@ -953,6 +975,71 @@ pub fn safe_intercept_interval(eat: &Eat, intercept: &Intercept) -> Option<(i32,
     }
 }
 
+// fn get_imp_x(garg_pos: &Vec2, garg_row: i32, rnd: i32, iced: bool, roof: bool) -> f32 {
+//     if garg_pos.x < GARG_THROW_IMP_THRES {
+//         return 0.;
+//     }
+//     let mut imp_velocity_y = garg_pos.x - 360. - (if roof { 180. } else { 0. });
+//     if imp_velocity_y >= 40. {
+//         if imp_velocity_y > 140. {
+//             imp_velocity_y -= rnd as f32;
+//         } else if rnd != 0 {
+//             return 0.;
+//         }
+//     } else {
+//         imp_velocity_y = 40.;
+//     }
+//     let imp_spawn_time = if iced { 210 } else { 105 };
+//     let shifted_y_of_y = |x: f32, roof: bool| {
+//         if !roof || x >= 400. {
+//             0.
+//         } else {
+//             (400. - x) / 4.
+//         }
+//     };
+//     let mut imp = Imp {
+//         state: ImpState::S71,
+//         position: Position {
+//             x: garg_pos.x - 133.,
+//             y: garg_pos.y,
+//             h: 88.,
+//             y_shift: shifted_y_of_y(garg_pos.x - 133., roof),
+//             row: garg_row,
+//         },
+//         velocity: Vec2 {
+//             x: -3.,
+//             y: imp_velocity_y / 3. * 0.5 * 0.05000000074505806,
+//         },
+//         exist_time: 0,
+//     };
+//     for _ in (imp_spawn_time + 1).. {
+//         imp.exist_time += 1;
+//         match imp.state {
+//             ImpState::S71 => {
+//                 imp.velocity = imp.velocity + GRAVITY;
+//                 imp.position.x += imp.velocity.x;
+//                 imp.position.h += imp.velocity.y;
+//                 imp.position.y_shift = shifted_y_of_y(imp.position.x, roof);
+//                 if imp.position.y_shift + imp.position.h < 0. {
+//                     return imp.position.x;
+//                 }
+//             }
+//             ImpState::S72 { countdown } => {
+//                 imp.state = ImpState::S72 {
+//                     countdown: (countdown - 1),
+//                 };
+//                 if countdown - 1 == 0 {
+//                     imp.state = ImpState::S0;
+//                 }
+//             }
+//             ImpState::S0 => {
+//                 break;
+//             }
+//         }
+//     }
+//     0.
+// }
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -961,6 +1048,24 @@ mod tests {
     fn test_ground_judge() {
         let scene = Scene::PE;
         let explode = Explode::of_cob(&Cob::Ground { row: 1, col: 8.5 }, &scene);
+
+        let (eat, intercept) = judge_internal(
+            &Vec2 { x: 788., y: 50. },
+            1,
+            100,
+            false,
+            false,
+            &Explode::of_cob(&Cob::Ground { row: 1, col: 4. }, &scene),
+        );
+        assert_eq!(
+            eat,
+            Eat::Both {
+                eat: 265,
+                iceable: 267
+            }
+        );
+        assert_eq!(intercept, Intercept::Success { min: 203, max: 264 });
+
         let (eat, intercept) =
             judge_internal(&Vec2 { x: 800., y: 50. }, 1, 57, false, false, &explode);
         assert_eq!(
@@ -971,6 +1076,7 @@ mod tests {
             }
         );
         assert_eq!(intercept, Intercept::Success { min: 107, max: 134 });
+
         let (eat, intercept) =
             judge_internal(&Vec2 { x: 800., y: 50. }, 1, 45, false, false, &explode);
         assert_eq!(
@@ -981,6 +1087,7 @@ mod tests {
             }
         );
         assert_eq!(intercept, Intercept::Success { min: 107, max: 133 });
+
         let (eat, intercept) = judge(
             &GargXRange::Ok {
                 min: 800.,
@@ -1080,7 +1187,7 @@ mod tests {
         assert_eq!(
             eat,
             Eat::Both {
-                eat: 322,
+                eat: 346, // old version: 322
                 iceable: 357
             }
         );
@@ -1112,4 +1219,51 @@ mod tests {
         let (min, max) = min_max_garg_walk_in_half_ticks(&(vec![0, 2499]), 3000);
         assert_eq!((min, max), (2400, 2702));
     }
+
+    // #[test]
+    // fn get_imp_x_table() {
+    //     let x = get_imp_x(
+    //         &Vec2 {
+    //             x: 766.999,
+    //             y: 135.,
+    //         },
+    //         2,
+    //         0,
+    //         false,
+    //         false,
+    //     );
+    //     println!("{}", x);
+    //     assert_eq!(x as i32, 162);
+    //     let mut res: Vec<Vec<f32>> = vec![vec![0.; 2]; 300];
+    //     for garg_x_times_thousand in 400_000..=854_000 {
+    //         let garg_x = garg_x_times_thousand as f32 / 1000.;
+    //         let mut min_imp_x = 999;
+    //         let mut max_imp_x = 0;
+    //         for rnd in [0, 100] {
+    //             let x = get_imp_x(&Vec2 { x: garg_x, y: 135. }, 2, rnd, false, false);
+    //             if x < 1. {
+    //                 continue;
+    //             }
+    //             let int_x = x.trunc() as usize;
+    //             if int_x < min_imp_x {
+    //                 min_imp_x = int_x;
+    //             }
+    //             if int_x > max_imp_x {
+    //                 max_imp_x = int_x;
+    //             }
+    //         }
+    //         for possible_imp_x in min_imp_x..=max_imp_x {
+    //             if res[possible_imp_x][0] < 1. || garg_x < res[possible_imp_x][0] {
+    //                 res[possible_imp_x][0] = garg_x;
+    //             }
+    //             if garg_x > res[possible_imp_x][1] {
+    //                 res[possible_imp_x][1] = garg_x;
+    //             }
+    //         }
+    //     }
+    //     for i in 0..300 {
+    //         println!("{}: ({:.3},{:.3}),", i, res[i][0], res[i][1]);
+    //     }
+    //     assert!(false);
+    // }
 }
