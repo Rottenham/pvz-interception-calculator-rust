@@ -163,7 +163,7 @@ pub const ABOUT: &str = r#"MIT 许可证
 pub const HELLO: &str = r#"本程序源码以MIT许可证发布:
 https://github.com/Rottenham/pvz-interception-calculator-rust
 
-欢迎使用拦截计算器v2.0.8.
+欢迎使用拦截计算器v2.0.9.
 当前场合: 后院.
 输入问号查看帮助; 按↑键显示上次输入的指令.
 
