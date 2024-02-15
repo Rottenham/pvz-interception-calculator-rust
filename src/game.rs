@@ -80,6 +80,7 @@ const RE_COB_DIST: [CobDist; 8] = [
     },
 ];
 const FLOAT_INT_DIFF_TOLERANCE: f32 = 0.01;
+pub const MAX_INTERCEPTION_DELAY: i32 = 999;
 
 #[derive(Debug)]
 struct Vec2 {
@@ -483,30 +484,27 @@ struct Imp {
 #[derive(PartialEq, Debug)]
 pub enum Eat {
     Empty,
-    OnlyEat(i32),
-    Both { eat: i32, iceable: i32 },
+    Some { eat: i32, iceable: i32 },
 }
 
 impl Eat {
+    fn new(eat: Option<i32>, iceable: Option<i32>) -> Self {
+        match (eat, iceable) {
+            (Some(e), Some(i)) => Self::Some { eat: e, iceable: i },
+            _ => Self::Empty,
+        }
+    }
+
     fn merge(self, other: Self) -> Self {
         match (self, other) {
             (Self::Empty, any) | (any, Self::Empty) => any,
-            (Self::OnlyEat(eat), Self::OnlyEat(other_eat))
-            | (Self::Both { eat, iceable: _ }, Self::OnlyEat(other_eat))
-            | (
-                Self::OnlyEat(eat),
-                Self::Both {
-                    eat: other_eat,
-                    iceable: _,
-                },
-            ) => Self::OnlyEat(cmp::min(eat, other_eat)),
             (
-                Self::Both { eat, iceable },
-                Self::Both {
+                Self::Some { eat, iceable },
+                Self::Some {
                     eat: other_eat,
                     iceable: other_iceable,
                 },
-            ) => Self::Both {
+            ) => Self::Some {
                 eat: (cmp::min(eat, other_eat)),
                 iceable: (cmp::max(iceable, other_iceable)),
             },
@@ -516,9 +514,8 @@ impl Eat {
     pub fn shift_to_plant_intercept(&mut self) {
         match self {
             Eat::Empty => {}
-            Eat::OnlyEat(eat) => *self = Eat::OnlyEat(*eat + 1),
-            Eat::Both { eat, iceable } => {
-                *self = Eat::Both {
+            Eat::Some { eat, iceable } => {
+                *self = Eat::Some {
                     eat: *eat + 1,
                     iceable: *iceable,
                 }
@@ -598,17 +595,6 @@ impl Intercept {
             }
         }
     }
-
-    pub fn exclude(&mut self, eat: &Eat) {
-        if let Eat::OnlyEat(eat) | Eat::Both { eat, iceable: _ } = eat {
-            if let Intercept::Success { min, max } = self {
-                *self = Intercept::Success {
-                    min: cmp::min(*min, eat - 1),
-                    max: cmp::min(*max, eat - 1),
-                }
-            }
-        }
-    }
 }
 
 pub enum GargXRange {
@@ -667,7 +653,7 @@ pub fn judge(
                         garg_row,
                         rnd,
                         iced,
-                        scene.is_roof(),
+                        scene,
                         explode,
                     );
                     eat = eat.merge(new_eat);
@@ -685,13 +671,13 @@ fn judge_internal(
     garg_row: i32,
     rnd: i32,
     iced: bool,
-    roof: bool,
+    scene: &Scene,
     explode: &Explode,
 ) -> (Eat, Intercept) {
     if garg_pos.x < GARG_THROW_IMP_THRES {
         return (Eat::Empty, Intercept::Empty);
     }
-    let mut imp_velocity_y = garg_pos.x - 360. - (if roof { 180. } else { 0. });
+    let mut imp_velocity_y = garg_pos.x - 360. - (if scene.is_roof() { 180. } else { 0. });
     if imp_velocity_y >= 40. {
         if imp_velocity_y > 140. {
             imp_velocity_y -= rnd as f32;
@@ -716,7 +702,7 @@ fn judge_internal(
             x: garg_pos.x - 133.,
             y: garg_pos.y,
             h: 88.,
-            y_shift: y_shift(garg_pos.x - 133., roof),
+            y_shift: y_shift(garg_pos.x - 133., scene.is_roof()),
             row: garg_row,
         },
         velocity: Vec2 {
@@ -725,17 +711,20 @@ fn judge_internal(
         },
         exist_time: 0,
     };
-    let mut eat = Eat::Empty;
+    let mut eat: Option<i32> = None;
+    let mut iceable: Option<i32> = None;
     let mut intercept = Intercept::Empty;
-    for tick in (imp_spawn_time + 1).. {
+    let mut tick = imp_spawn_time + 1;
+    while eat.is_none() || iceable.is_none() {
         imp.exist_time += 1;
         match imp.state {
             ImpState::S71 => {
                 imp.velocity = imp.velocity + GRAVITY;
                 imp.position.x += imp.velocity.x;
-                imp.position.h += imp.velocity.y;
-                imp.position.y_shift = y_shift(imp.position.x, roof);
-                if imp.position.y_shift + imp.position.h < 0. {
+                let new_y_shift = y_shift(imp.position.x, scene.is_roof());
+                imp.position.h += imp.velocity.y + (new_y_shift - imp.position.y_shift);
+                imp.position.y_shift = new_y_shift;
+                if imp.position.h <= 0. {
                     imp.position.h = 0.;
                     imp.state = ImpState::S72 {
                         countdown: (if iced { 50 } else { 25 }),
@@ -749,36 +738,28 @@ fn judge_internal(
                 if countdown - 1 == 0 {
                     imp.state = ImpState::S0;
                     if imp.exist_time % eat_loop == 0 {
-                        eat = Eat::OnlyEat(tick);
+                        eat = Some(tick);
                     }
                 }
             }
             ImpState::S0 => {
-                let diff_til_next_multiple = |num: i32, multiplier: i32| {
-                    let remainder = num % multiplier;
-                    if remainder == 0 {
-                        0
-                    } else {
-                        multiplier - remainder
-                    }
-                };
-                eat = Eat::Both {
-                    eat: match eat {
-                        Eat::OnlyEat(eat) | Eat::Both { eat, iceable: _ } => eat,
-                        Eat::Empty => cmp::min(
-                            diff_til_next_multiple(imp.exist_time, eat_loop) + tick,
-                            diff_til_next_multiple(imp.exist_time - 1, eat_loop) + tick,
-                        ),
-                    },
-                    iceable: tick + 1,
-                };
-                break;
+                if iceable.is_none() {
+                    iceable = Some(tick - 1);
+                }
+                if eat.is_none() && imp.exist_time % eat_loop == 0 {
+                    eat = Some(tick);
+                }
             }
         }
         intercept.update(tick, &imp.position, explode);
+        tick += 1;
     }
-    intercept.exclude(&eat);
-    (eat, intercept)
+    if let Intercept::Success { min: _, max } = &mut intercept {
+        if *max == tick - 1 {
+            *max = MAX_INTERCEPTION_DELAY;
+        }
+    }
+    (Eat::new(eat, iceable), intercept)
 }
 
 pub struct IceAndCobTimes {
@@ -953,10 +934,7 @@ pub fn hit_col_matching_int_pixel(unvalidated_hit_col: f32) -> Option<f32> {
 
 pub fn unsafe_intercept_interval(eat: &Eat, intercept: &Intercept) -> Option<(i32, i32)> {
     match (&eat, &intercept) {
-        (Eat::OnlyEat(eat), Intercept::Success { min, max })
-        | (Eat::Both { eat, iceable: _ }, Intercept::Success { min, max })
-            if eat <= max =>
-        {
+        (Eat::Some { eat, iceable: _ }, Intercept::Success { min, max }) if eat <= max => {
             Some((cmp::max(*eat, *min), *max))
         }
         _ => None,
@@ -965,10 +943,7 @@ pub fn unsafe_intercept_interval(eat: &Eat, intercept: &Intercept) -> Option<(i3
 
 pub fn safe_intercept_interval(eat: &Eat, intercept: &Intercept) -> Option<(i32, i32)> {
     match (&eat, &intercept) {
-        (Eat::OnlyEat(eat), Intercept::Success { min, max })
-        | (Eat::Both { eat, iceable: _ }, Intercept::Success { min, max })
-            if eat > min =>
-        {
+        (Eat::Some { eat, iceable: _ }, Intercept::Success { min, max }) if eat > min => {
             Some((*min, cmp::min(*eat - 1, *max)))
         }
         _ => None,
@@ -1054,36 +1029,42 @@ mod tests {
             1,
             100,
             false,
-            false,
+            &scene,
             &Explode::of_cob(&Cob::Ground { row: 1, col: 4. }, &scene),
         );
         assert_eq!(
             eat,
-            Eat::Both {
+            Eat::Some {
                 eat: 265,
-                iceable: 267
+                iceable: 265 // old: 267
             }
         );
-        assert_eq!(intercept, Intercept::Success { min: 203, max: 264 });
+        assert_eq!(
+            intercept,
+            Intercept::Success {
+                min: 203,
+                max: MAX_INTERCEPTION_DELAY
+            }
+        );
 
         let (eat, intercept) =
-            judge_internal(&Vec2 { x: 800., y: 50. }, 1, 57, false, false, &explode);
+            judge_internal(&Vec2 { x: 800., y: 50. }, 1, 57, false, &scene, &explode);
         assert_eq!(
             eat,
-            Eat::Both {
+            Eat::Some {
                 eat: 281,
-                iceable: 283
+                iceable: 281 // old: 283
             }
         );
         assert_eq!(intercept, Intercept::Success { min: 107, max: 134 });
 
         let (eat, intercept) =
-            judge_internal(&Vec2 { x: 800., y: 50. }, 1, 45, false, false, &explode);
+            judge_internal(&Vec2 { x: 800., y: 50. }, 1, 45, false, &scene, &explode);
         assert_eq!(
             eat,
-            Eat::Both {
+            Eat::Some {
                 eat: 285,
-                iceable: 286
+                iceable: 284 // old: 286
             }
         );
         assert_eq!(intercept, Intercept::Success { min: 107, max: 133 });
@@ -1099,9 +1080,9 @@ mod tests {
         );
         assert_eq!(
             eat,
-            Eat::Both {
+            Eat::Some {
                 eat: 269,
-                iceable: 299
+                iceable: 297 // old: 299
             }
         );
         assert_eq!(intercept, Intercept::Success { min: 107, max: 128 });
@@ -1117,9 +1098,9 @@ mod tests {
         );
         assert_eq!(
             eat,
-            Eat::Both {
+            Eat::Some {
                 eat: 338,
-                iceable: 391
+                iceable: 389 // old: 391
             }
         );
         assert_eq!(intercept, Intercept::Fail);
@@ -1138,22 +1119,22 @@ mod tests {
             &scene,
         );
         let (eat, intercept) =
-            judge_internal(&Vec2 { x: 800., y: 40. }, 1, 50, false, true, &explode);
+            judge_internal(&Vec2 { x: 800., y: 40. }, 1, 50, false, &scene, &explode);
         assert_eq!(
             eat,
-            Eat::Both {
-                eat: 241,
-                iceable: 240
+            Eat::Some {
+                eat: 237,     // old: 241
+                iceable: 237  // old: 240
             }
         );
         assert_eq!(intercept, Intercept::Success { min: 107, max: 167 });
         let (eat, intercept) =
-            judge_internal(&Vec2 { x: 800., y: 40. }, 1, 70, false, true, &explode);
+            judge_internal(&Vec2 { x: 800., y: 40. }, 1, 70, false, &scene, &explode);
         assert_eq!(
             eat,
-            Eat::Both {
+            Eat::Some {
                 eat: 233,
-                iceable: 234
+                iceable: 231 // old: 234
             }
         );
         assert_eq!(intercept, Intercept::Success { min: 107, max: 167 });
@@ -1168,9 +1149,9 @@ mod tests {
         );
         assert_eq!(
             eat,
-            Eat::Both {
+            Eat::Some {
                 eat: 225,
-                iceable: 255
+                iceable: 253 // old: 255
             }
         );
         assert_eq!(intercept, Intercept::Success { min: 107, max: 167 });
@@ -1186,9 +1167,9 @@ mod tests {
         );
         assert_eq!(
             eat,
-            Eat::Both {
-                eat: 346, // old version: 322
-                iceable: 357
+            Eat::Some {
+                eat: 346,     // old: 322
+                iceable: 355  // old: 357
             }
         );
         assert_eq!(intercept, Intercept::Fail);

@@ -163,7 +163,7 @@ pub const ABOUT: &str = r#"MIT 许可证
 pub const HELLO: &str = r#"本程序源码以MIT许可证发布:
 https://github.com/Rottenham/pvz-interception-calculator-rust
 
-欢迎使用拦截计算器v2.0.9.
+欢迎使用拦截计算器v2.0.10.
 当前场合: 后院.
 输入问号查看帮助; 按↑键显示上次输入的指令.
 
@@ -220,7 +220,5 @@ pub const UNKNOWN_COMMAND: &str = "未知指令. 输入问号查看帮助.";
 pub const ERROR: &str = "出现错误";
 
 // game.rs
-pub const GARG_MIN_WALK_OUT_OF_RANGE: &str =
-    "巨人最短行走时间[{}]超出数据范围({}~{})";
-pub const GARG_MAX_WALK_OUT_OF_RANGE: &str =
-    "巨人最长行走时间[{}]超出数据范围({}~{})";
+pub const GARG_MIN_WALK_OUT_OF_RANGE: &str = "巨人最短行走时间[{}]超出数据范围({}~{})";
+pub const GARG_MAX_WALK_OUT_OF_RANGE: &str = "巨人最长行走时间[{}]超出数据范围({}~{})";

@@ -180,7 +180,7 @@ is committed to be as close to the actual game as possible."#;
 pub const HELLO: &str = r#"Source code is available under MIT license:
 https://github.com/Rottenham/pvz-interception-calculator-rust
 
-Interception Calculator v2.0.9
+Interception Calculator v2.0.10
 Current scene: Backyard.
 Type '?' for help; press ↑ to show previous commands.
 
@@ -249,5 +249,7 @@ pub const UNKNOWN_COMMAND: &str = "Unknown command. Type '?' for help.";
 pub const ERROR: &str = "Error";
 
 // game.rs
-pub const GARG_MIN_WALK_OUT_OF_RANGE:&str = "garg min walk time [{}] is out of available data range ({}~{})";
-pub const GARG_MAX_WALK_OUT_OF_RANGE:&str = "garg max walk time [{}] is out of available data range ({}~{})";
+pub const GARG_MIN_WALK_OUT_OF_RANGE: &str =
+    "garg min walk time [{}] is out of available data range ({}~{})";
+pub const GARG_MAX_WALK_OUT_OF_RANGE: &str =
+    "garg max walk time [{}] is out of available data range ({}~{})";

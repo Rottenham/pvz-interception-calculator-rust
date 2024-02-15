@@ -1,5 +1,6 @@
 use crate::game;
 use dyn_fmt::AsStrFormatExt;
+use game::MAX_INTERCEPTION_DELAY;
 use std::io::Write;
 use std::str;
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
@@ -142,11 +143,20 @@ pub fn print_eat_and_intercept(eat: &game::Eat, intercept: &game::Intercept) {
             print_colored(CANNOT_INTERCEPT, Color::Yellow)
         }
         game::Intercept::Success { min, max } => {
-            print!("{}~{}", min, max,);
+            if *max == MAX_INTERCEPTION_DELAY {
+                print!("{}+", min);
+            } else {
+                print!("{}~{}", min, max,);
+            }
             match game::unsafe_intercept_interval(eat, intercept) {
                 None => println!(),
                 Some((min, max)) => print_colored(
-                    format!(" ({}~{}{WILL_CAUSE_HARM})", min, max).as_str(),
+                    if max != MAX_INTERCEPTION_DELAY {
+                        format!(" ({}~{}{WILL_CAUSE_HARM})", min, max)
+                    } else {
+                        format!(" ({}+{WILL_CAUSE_HARM})", min)
+                    }
+                    .as_str(),
                     Color::Yellow,
                 ),
             }
@@ -156,14 +166,14 @@ pub fn print_eat_and_intercept(eat: &game::Eat, intercept: &game::Intercept) {
         "{EARLIEST_EAT}: {}",
         match &eat {
             game::Eat::Empty => DOES_NOT_EAT.to_string(),
-            game::Eat::OnlyEat(eat) | game::Eat::Both { eat, iceable: _ } => eat.to_string(),
+            game::Eat::Some { eat, iceable: _ } => eat.to_string(),
         }
     );
     println!(
         "{EARLIEST_ICEABLE}: {}",
         match &eat {
-            game::Eat::Empty | game::Eat::OnlyEat(_) => NOT_ICEABLE.to_string(),
-            game::Eat::Both { eat: _, iceable } => iceable.to_string(),
+            game::Eat::Empty => NOT_ICEABLE.to_string(),
+            game::Eat::Some { eat: _, iceable } => iceable.to_string(),
         }
     );
 }
