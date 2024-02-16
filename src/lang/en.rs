@@ -180,7 +180,7 @@ is committed to be as close to the actual game as possible."#;
 pub const HELLO: &str = r#"Source code is available under MIT license:
 https://github.com/Rottenham/pvz-interception-calculator-rust
 
-Interception Calculator v2.0.10
+Interception Calculator v2.0.11
 Current scene: Backyard.
 Type '?' for help; press ↑ to show previous commands.
 
@@ -201,6 +201,9 @@ delay [hit col] (cob tail col)
                         (need to provide cob tail col for roof scene)
                     eg. $ delay 8.8 -> Calc hit col 8.8
                         $ delay 3.5 4 -> Calc hit col 3.5 for cob tail col 4
+
+delay2 ...
+delay3 ...              Same as above, but specify intercepting 2/3 rows
 
 delay [hit row] [hit col] (cob tail col)
   > [garg rows] (garg x range) (u/i)
