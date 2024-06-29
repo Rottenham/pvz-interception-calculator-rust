@@ -494,7 +494,7 @@ impl Parser {
                             };
                             (self.min_max_garg_x, self.scene.cob_dist(Some(cob_col)))
                         }
-                        [delay_time, cob_col] => {
+                        [cob_col, delay_time] => {
                             let (Ok(delay_time), Ok(cob_col)) = (
                                 Parser::parse_delay_time(delay_time),
                                 Parser::parse_cob_col(cob_col),
