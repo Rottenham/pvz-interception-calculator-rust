@@ -732,17 +732,31 @@ impl Parser {
                         printer::print_error_with_input(IMP_X_SHOULD_BE_INTEGER, imp_x);
                         return ParseResult::Matched;
                     };
-                    let Some((min_garg_x, max_garg_x)) =
-                        constants::min_max_garg_pos_of_imp_x(imp_x)
-                    else {
-                        printer::print_error_with_input(
-                            &IMP_X_SHOULD_BE_IN_RANGE
-                                .format(&[constants::MIN_IMP_X, constants::MAX_IMP_X]),
-                            imp_x.to_string().as_str(),
-                        );
-                        return ParseResult::Matched;
-                    };
-                    println!("{GARG_X_RANGE}: {:.3}~{:.3}", min_garg_x, max_garg_x);
+                    if self.scene.is_roof() {
+                        let Some((min_garg_x, max_garg_x)) =
+                            constants::min_max_garg_pos_of_imp_x_of_roof(imp_x)
+                        else {
+                            printer::print_error_with_input(
+                                &IMP_X_SHOULD_BE_IN_RANGE
+                                    .format(&[constants::MIN_IMP_X_OF_ROOF, constants::MAX_IMP_X_OF_ROOF]),
+                                imp_x.to_string().as_str(),
+                            );
+                            return ParseResult::Matched;
+                        };
+                        println!("{GARG_X_RANGE}: {:.3}~{:.3}", min_garg_x, max_garg_x);
+                    } else {
+                        let Some((min_garg_x, max_garg_x)) =
+                            constants::min_max_garg_pos_of_imp_x(imp_x)
+                        else {
+                            printer::print_error_with_input(
+                                &IMP_X_SHOULD_BE_IN_RANGE
+                                    .format(&[constants::MIN_IMP_X, constants::MAX_IMP_X]),
+                                imp_x.to_string().as_str(),
+                            );
+                            return ParseResult::Matched;
+                        };
+                        println!("{GARG_X_RANGE}: {:.3}~{:.3}", min_garg_x, max_garg_x);
+                    }
                     ParseResult::Matched
                 }
                 _ => {
