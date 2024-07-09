@@ -180,7 +180,7 @@ is committed to be as close to the actual game as possible."#;
 pub const HELLO: &str = r#"Source code is available under MIT license:
 https://github.com/Rottenham/pvz-interception-calculator-rust
 
-Interception Calculator v2.0.12
+Interception Calculator v2.0.13
 Current scene: Backyard.
 Type '?' for help; press ↑ to show previous commands.
 
