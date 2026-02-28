@@ -727,7 +727,7 @@ fn judge_internal(
                 if imp.position.h <= 0. {
                     imp.position.h = 0.;
                     imp.state = ImpState::S72 {
-                        countdown: (if iced { 50 } else { 25 }),
+                        countdown: (if iced { 51 } else { 25 }),
                     }
                 }
             }
