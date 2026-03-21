@@ -31,7 +31,7 @@ fn main() -> rustyline::Result<()> {
                 if let ParseResult::Matched = parser.parse_find_max_delay(input.as_str()) {
                     continue;
                 }
-                if let ParseResult::Matched = parser.parse_garg_x_range_of_imp_x(input.as_str()) {
+                if let ParseResult::Matched = parser.parse_imp(input.as_str()) {
                     continue;
                 }
                 if let ParseResult::Matched = parser.parse_about(input.as_str()) {
@@ -40,7 +40,7 @@ fn main() -> rustyline::Result<()> {
                 if let ParseResult::Matched = parser.parse_help(input.as_str()) {
                     continue;
                 }
-                println!("{UNKNOWN_COMMAND}");
+                parser.eval_expr(input.as_str());
             }
             Err(rustyline::error::ReadlineError::Interrupted)
             | Err(rustyline::error::ReadlineError::Eof) => {

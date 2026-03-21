@@ -1,6 +1,6 @@
 // validate_garg_x_range
-pub const GARG_X_RANGE_CANCELLED: &str = "x坐标<401的巨人不会投掷小鬼, 跳过计算.";
-pub const GARG_X_RANGE_MODIFIED: &str = "x坐标<401的巨人不会投掷小鬼, 改用{}~{}计算.";
+pub const GARG_X_RANGE_CANCELLED: &str = "x坐标≤400的巨人不会投掷小鬼, 跳过计算.";
+pub const GARG_X_RANGE_MODIFIED: &str = "x坐标≤400的巨人不会投掷小鬼, 改用{}~{}计算.";
 
 // parse_scene
 pub const SET_FRONTYARD: &str = "已设置为前院场合.";
@@ -27,10 +27,13 @@ pub const NEED_HIT_COL_RANGE_COB_COL: &str = "请提供炮落点列范围(逗号
 pub const CANNOT_INTERCEPT_WITHOUT_HARM: &str = "无法无伤拦截.";
 pub const HIT_COL_WITH_MAX_DELAY: &str = "延迟最大的炮落点";
 
-// parse_garg_x_range_of_imp_x
-pub const NEED_IMP_X_RANGE: &str = "请提供小鬼x坐标(整数)";
+// parse_imp
+pub const NEED_GARG_X_OR_IMP_X: &str = "请提供巨人x坐标，或使用 imp garg 小鬼x坐标";
+pub const NEED_IMP_X_RANGE: &str = "请提供小鬼x坐标(整数)，或逗号分隔的两个整数";
 pub const IMP_X_SHOULD_BE_INTEGER: &str = "小鬼x坐标应为整数";
 pub const IMP_X_SHOULD_BE_IN_RANGE: &str = "应满足{}≤小鬼x坐标≤{}";
+pub const GARG_X_SHOULD_BE_NUMBER: &str = "巨人x坐标应为数字";
+pub const IMP_X_RANGE: &str = "小鬼x坐标范围";
 
 // parse_ice_times
 pub const ICE_TIMES_SHOULD_BE_INTEGER: &str = "用冰时机应为整数";
@@ -163,10 +166,11 @@ pub const ABOUT: &str = r#"MIT 许可证
 pub const HELLO: &str = r#"本程序源码以MIT许可证发布:
 https://github.com/Rottenham/pvz-interception-calculator-rust
 
-欢迎使用拦截计算器v2.0.13.
+欢迎使用拦截计算器v2.0.15.
 当前场合: 后院.
 输入问号查看帮助; 按↑键显示上次输入的指令.
 
+在本程序中，完美预判冰对应冰时机为 1，ICE3 冰对应冰时机为 11.
 计算结果默认为炮激活的情况. 若为植物激活, 需额外-1."#;
 
 pub const HELP: &str = r#"
@@ -214,7 +218,8 @@ max 炮行数 炮列数范围
                                 例：$ max 1 7,7.5 > 1,2 ->
                                         找1路7~7.5列炮拦1、2路巨人延迟最多的落点
 
-imp 小鬼x坐标                       计算投掷该坐标小鬼的巨人x范围
+imp 巨人x坐标                       计算该巨人投掷的小鬼x坐标范围
+imp garg 小鬼x坐标(或x1,x2)         计算投掷该坐标/区间小鬼的巨人x范围
 
 ?/help                              显示此帮助
 about                               关于拦截计算器"#;

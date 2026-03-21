@@ -2,6 +2,7 @@ use crate::constants;
 use crate::game;
 use crate::printer;
 use dyn_fmt::AsStrFormatExt;
+use evalexpr::{eval_with_context_mut, HashMapContext, Value};
 
 #[cfg(feature = "en")]
 use crate::lang::en::*;
@@ -12,6 +13,38 @@ use crate::lang::zh::*;
 const DEFAULT_SCENE: game::Scene = game::Scene::PE;
 const DEFAULT_COB_TIME: i32 = 318;
 const DEFAULT_ROOF_COB_ROW: i32 = 3;
+
+enum EvalError {
+    Eval(String),
+    Type(String),
+}
+
+fn eval_as_i32(expr: &str, ctx: &mut HashMapContext) -> Result<i32, EvalError> {
+    match eval_with_context_mut(expr, ctx) {
+        Ok(Value::Int(v)) => {
+            i32::try_from(v).map_err(|_| EvalError::Type(v.to_string()))
+        }
+        Ok(Value::Float(f)) => {
+            let r = f.round();
+            if (f - r).abs() < 1e-6 {
+                i32::try_from(r as i64).map_err(|_| EvalError::Type(f.to_string()))
+            } else {
+                Err(EvalError::Type(f.to_string()))
+            }
+        }
+        Ok(v) => Err(EvalError::Type(v.to_string())),
+        Err(e) => Err(EvalError::Eval(e.to_string())),
+    }
+}
+
+fn eval_as_f32(expr: &str, ctx: &mut HashMapContext) -> Result<f32, EvalError> {
+    match eval_with_context_mut(expr, ctx) {
+        Ok(Value::Int(v)) => Ok(v as f32),
+        Ok(Value::Float(f)) => Ok(f as f32),
+        Ok(v) => Err(EvalError::Type(v.to_string())),
+        Err(e) => Err(EvalError::Eval(e.to_string())),
+    }
+}
 
 fn validate_garg_x_range(min_max_garg_x: &mut (f32, f32)) -> Result<game::GargXRange, ()> {
     match game::GargXRange::of_min_max_garg_pos(*min_max_garg_x) {
@@ -31,13 +64,14 @@ fn validate_garg_x_range(min_max_garg_x: &mut (f32, f32)) -> Result<game::GargXR
 struct ParsedGargPos {
     garg_rows: Vec<i32>,
     min_max_garg_x: Option<(f32, f32)>,
-    ice_flag: Option<bool>,
+    ice_flag: Option<i32>,
 }
 
 pub struct Parser {
     scene: game::Scene,
     ice_and_cob_times: game::IceAndCobTimes,
     min_max_garg_x: (f32, f32),
+    eval_context: HashMapContext,
 }
 
 pub enum ParseResult {
@@ -56,6 +90,7 @@ impl Default for Parser {
             scene,
             ice_and_cob_times,
             min_max_garg_x,
+            eval_context: HashMapContext::new(),
         }
     }
 }
@@ -113,8 +148,8 @@ impl Parser {
                     }
                     [ice_times @ .., cob_time] => {
                         let (Ok(ice_times), Ok(cob_time)) = (
-                            Parser::parse_ice_times(ice_times),
-                            Parser::parse_cob_time(cob_time),
+                            Parser::parse_ice_times(ice_times, &mut self.eval_context),
+                            Parser::parse_cob_time(cob_time, &mut self.eval_context),
                         ) else {
                             return ParseResult::Matched;
                         };
@@ -146,7 +181,7 @@ impl Parser {
         }
     }
 
-    pub fn parse_delay(&self, input: &str) -> ParseResult {
+    pub fn parse_delay(&mut self, input: &str) -> ParseResult {
         match input.split_whitespace().collect::<Vec<&str>>().as_slice() {
             [command, extra_args @ ..] => {
                 let delay_mode = match *command {
@@ -176,8 +211,8 @@ impl Parser {
                             }
                             [hit_row, hit_col, ">", garg_pos_args @ ..] if *command == "delay" => {
                                 let (Ok(hit_row), Ok(hit_col)) = (
-                                    Parser::parse_hit_row(hit_row, &self.scene.all_rows()),
-                                    Parser::parse_hit_col(hit_col),
+                                    Parser::parse_hit_row(hit_row, &self.scene.all_rows(), &mut self.eval_context),
+                                    Parser::parse_hit_col(hit_col, &mut self.eval_context),
                                 ) else {
                                     return ParseResult::Matched;
                                 };
@@ -188,6 +223,7 @@ impl Parser {
                                 }) = Parser::parse_garg_pos(
                                     garg_pos_args,
                                     &self.scene.garg_rows_for_cob(hit_row),
+                                    &mut self.eval_context,
                                 )
                                 else {
                                     return ParseResult::Matched;
@@ -208,7 +244,7 @@ impl Parser {
                                 return ParseResult::Matched;
                             }
                             [hit_col] => {
-                                let Ok(hit_col) = Parser::parse_hit_col(hit_col) else {
+                                let Ok(hit_col) = Parser::parse_hit_col(hit_col, &mut self.eval_context) else {
                                     return ParseResult::Matched;
                                 };
                                 (
@@ -255,9 +291,9 @@ impl Parser {
                                 if *command == "delay" =>
                             {
                                 let (Ok(hit_row), Ok(hit_col), Ok(cob_col)) = (
-                                    Parser::parse_hit_row(hit_row, &self.scene.all_rows()),
-                                    Parser::parse_hit_col(hit_col),
-                                    Parser::parse_cob_col(cob_col),
+                                    Parser::parse_hit_row(hit_row, &self.scene.all_rows(), &mut self.eval_context),
+                                    Parser::parse_hit_col(hit_col, &mut self.eval_context),
+                                    Parser::parse_cob_col(cob_col, &mut self.eval_context),
                                 ) else {
                                     return ParseResult::Matched;
                                 };
@@ -268,6 +304,7 @@ impl Parser {
                                 }) = Parser::parse_garg_pos(
                                     garg_pos_args,
                                     &self.scene.garg_rows_for_cob(hit_row),
+                                    &mut self.eval_context,
                                 )
                                 else {
                                     return ParseResult::Matched;
@@ -295,8 +332,8 @@ impl Parser {
                             }
                             [hit_col, cob_col] => {
                                 let (Ok(hit_col), Ok(cob_col)) = (
-                                    Parser::parse_hit_col(hit_col),
-                                    Parser::parse_cob_col(cob_col),
+                                    Parser::parse_hit_col(hit_col, &mut self.eval_context),
+                                    Parser::parse_cob_col(cob_col, &mut self.eval_context),
                                 ) else {
                                     return ParseResult::Matched;
                                 };
@@ -355,7 +392,7 @@ impl Parser {
         }
     }
 
-    pub fn parse_doom(&self, input: &str) -> ParseResult {
+    pub fn parse_doom(&mut self, input: &str) -> ParseResult {
         match input.split_whitespace().collect::<Vec<&str>>().as_slice() {
             ["doom", extra_args @ ..] => match extra_args {
                 [] => {
@@ -368,8 +405,8 @@ impl Parser {
                 }
                 [doom_row, doom_col, garg_pos_args @ ..] => {
                     let (Ok(doom_row), Ok(doom_col)) = (
-                        Parser::parse_doom_row(doom_row, &self.scene.all_rows()),
-                        Parser::parse_doom_col(doom_col),
+                        Parser::parse_doom_row(doom_row, &self.scene.all_rows(), &mut self.eval_context),
+                        Parser::parse_doom_col(doom_col, &mut self.eval_context),
                     ) else {
                         return ParseResult::Matched;
                     };
@@ -396,6 +433,7 @@ impl Parser {
                                 }) = Parser::parse_garg_pos(
                                     garg_pos_args,
                                     &self.scene.garg_rows_for_doom(doom_row),
+                                    &mut self.eval_context,
                                 )
                                 else {
                                     return ParseResult::Matched;
@@ -441,14 +479,14 @@ impl Parser {
         }
     }
 
-    pub fn parse_hit_or_nohit(&self, input: &str) -> ParseResult {
+    pub fn parse_hit_or_nohit(&mut self, input: &str) -> ParseResult {
         match input.split_whitespace().collect::<Vec<&str>>().as_slice() {
             ["hit", extra_args @ ..] | ["nohit", extra_args @ ..] => {
                 let (min_max_garg_x, cob_dist) = if !self.scene.is_roof() {
                     match extra_args {
                         [] => (self.min_max_garg_x, self.scene.cob_dist(None)),
                         [delay_time] => {
-                            let Ok(delay_time) = Parser::parse_delay_time(delay_time) else {
+                            let Ok(delay_time) = Parser::parse_delay_time(delay_time, &mut self.eval_context) else {
                                 return ParseResult::Matched;
                             };
                             match game::IceAndCobTimes::of_ice_times_and_cob_time(
@@ -489,15 +527,15 @@ impl Parser {
                             return ParseResult::Matched;
                         }
                         [cob_col] => {
-                            let Ok(cob_col) = Parser::parse_cob_col(cob_col) else {
+                            let Ok(cob_col) = Parser::parse_cob_col(cob_col, &mut self.eval_context) else {
                                 return ParseResult::Matched;
                             };
                             (self.min_max_garg_x, self.scene.cob_dist(Some(cob_col)))
                         }
                         [cob_col, delay_time] => {
                             let (Ok(delay_time), Ok(cob_col)) = (
-                                Parser::parse_delay_time(delay_time),
-                                Parser::parse_cob_col(cob_col),
+                                Parser::parse_delay_time(delay_time, &mut self.eval_context),
+                                Parser::parse_cob_col(cob_col, &mut self.eval_context),
                             ) else {
                                 return ParseResult::Matched;
                             };
@@ -547,7 +585,7 @@ impl Parser {
         }
     }
 
-    pub fn parse_find_max_delay(&self, input: &str) -> ParseResult {
+    pub fn parse_find_max_delay(&mut self, input: &str) -> ParseResult {
         match input.split_whitespace().collect::<Vec<&str>>().as_slice() {
             ["max", extra_args @ ..] => {
                 let (cob_list, garg_rows, mut min_max_garg_x, ice_flag) = if !self.scene.is_roof() {
@@ -562,8 +600,8 @@ impl Parser {
                         }
                         [hit_row, min_max_hit_col, ">", garg_pos_args @ ..] => {
                             let (Ok(hit_row), Ok((min_hit_col, max_hit_col))) = (
-                                Parser::parse_hit_row(hit_row, &self.scene.all_rows()),
-                                Parser::parse_min_max_hit_col(min_max_hit_col),
+                                Parser::parse_hit_row(hit_row, &self.scene.all_rows(), &mut self.eval_context),
+                                Parser::parse_min_max_hit_col(min_max_hit_col, &mut self.eval_context),
                             ) else {
                                 return ParseResult::Matched;
                             };
@@ -574,6 +612,7 @@ impl Parser {
                             }) = Parser::parse_garg_pos(
                                 garg_pos_args,
                                 &self.scene.garg_rows_for_cob(hit_row),
+                                &mut self.eval_context,
                             )
                             else {
                                 return ParseResult::Matched;
@@ -612,9 +651,9 @@ impl Parser {
                         }
                         [hit_row, min_max_hit_col, cob_col, ">", garg_pos_args @ ..] => {
                             let (Ok(hit_row), Ok((min_hit_col, max_hit_col)), Ok(cob_col)) = (
-                                Parser::parse_hit_row(hit_row, &self.scene.all_rows()),
-                                Parser::parse_min_max_hit_col(min_max_hit_col),
-                                Parser::parse_cob_col(cob_col),
+                                Parser::parse_hit_row(hit_row, &self.scene.all_rows(), &mut self.eval_context),
+                                Parser::parse_min_max_hit_col(min_max_hit_col, &mut self.eval_context),
+                                Parser::parse_cob_col(cob_col, &mut self.eval_context),
                             ) else {
                                 return ParseResult::Matched;
                             };
@@ -625,6 +664,7 @@ impl Parser {
                             }) = Parser::parse_garg_pos(
                                 garg_pos_args,
                                 &self.scene.garg_rows_for_cob(hit_row),
+                                &mut self.eval_context,
                             )
                             else {
                                 return ParseResult::Matched;
@@ -720,29 +760,127 @@ impl Parser {
         }
     }
 
-    pub fn parse_garg_x_range_of_imp_x(&self, input: &str) -> ParseResult {
+    pub fn parse_imp(&mut self, input: &str) -> ParseResult {
         match input.split_whitespace().collect::<Vec<&str>>().as_slice() {
             ["imp", extra_args @ ..] => match extra_args {
                 [] => {
+                    printer::print_error(NEED_GARG_X_OR_IMP_X);
+                    ParseResult::Matched
+                }
+                ["garg"] => {
                     printer::print_error(NEED_IMP_X_RANGE);
                     ParseResult::Matched
                 }
-                [imp_x] => {
-                    let Ok(imp_x) = imp_x.parse::<i32>() else {
-                        printer::print_error_with_input(IMP_X_SHOULD_BE_INTEGER, imp_x);
-                        return ParseResult::Matched;
+                ["garg", imp_x] => {
+                    let is_roof = self.scene.is_roof();
+                    let (min_valid_imp_x, max_valid_imp_x) = constants::imp_x_bounds(is_roof);
+                    let floor_3 = |v: f32| (v * 1000.0).floor() / 1000.0;
+                    match imp_x.replace('，', ",").split(',').collect::<Vec<&str>>().as_slice() {
+                        [single_imp_x] => {
+                            let imp_x = match eval_as_i32(single_imp_x, &mut self.eval_context) {
+                                Ok(v) => v,
+                                Err(EvalError::Eval(e)) => {
+                                    printer::print_error(&e);
+                                    return ParseResult::Matched;
+                                }
+                                Err(EvalError::Type(v)) => {
+                                    printer::print_error_with_input(IMP_X_SHOULD_BE_INTEGER, &v);
+                                    return ParseResult::Matched;
+                                }
+                            };
+                            let Some((min_garg_x, max_garg_x)) =
+                                constants::min_max_garg_pos_of_imp_x_by_scene(imp_x, is_roof)
+                            else {
+                                printer::print_error_with_input(
+                                    &IMP_X_SHOULD_BE_IN_RANGE
+                                        .format(&[min_valid_imp_x, max_valid_imp_x]),
+                                    imp_x.to_string().as_str(),
+                                );
+                                return ParseResult::Matched;
+                            };
+                            println!("{GARG_X_RANGE}: {:.3}~{:.3}", floor_3(min_garg_x), floor_3(max_garg_x));
+                        }
+                        [min_imp_x, max_imp_x] => {
+                            let min_imp_x = match eval_as_i32(min_imp_x, &mut self.eval_context) {
+                                Ok(v) => v,
+                                Err(EvalError::Eval(e)) => {
+                                    printer::print_error(&e);
+                                    return ParseResult::Matched;
+                                }
+                                Err(EvalError::Type(v)) => {
+                                    printer::print_error_with_input(IMP_X_SHOULD_BE_INTEGER, &v);
+                                    return ParseResult::Matched;
+                                }
+                            };
+                            let max_imp_x = match eval_as_i32(max_imp_x, &mut self.eval_context) {
+                                Ok(v) => v,
+                                Err(EvalError::Eval(e)) => {
+                                    printer::print_error(&e);
+                                    return ParseResult::Matched;
+                                }
+                                Err(EvalError::Type(v)) => {
+                                    printer::print_error_with_input(IMP_X_SHOULD_BE_INTEGER, &v);
+                                    return ParseResult::Matched;
+                                }
+                            };
+                            let (min_imp_x, max_imp_x) = if min_imp_x <= max_imp_x {
+                                (min_imp_x, max_imp_x)
+                            } else {
+                                (max_imp_x, min_imp_x)
+                            };
+                            let clamped_min_imp_x = min_imp_x.max(min_valid_imp_x);
+                            let clamped_max_imp_x = max_imp_x.min(max_valid_imp_x);
+                            if clamped_min_imp_x > clamped_max_imp_x {
+                                printer::print_error_with_input(
+                                    &IMP_X_SHOULD_BE_IN_RANGE
+                                        .format(&[min_valid_imp_x, max_valid_imp_x]),
+                                    imp_x,
+                                );
+                                return ParseResult::Matched;
+                            }
+                            let Some((range_min, range_max)) = constants::union_min_max_garg_pos_of_imp_x_range(
+                                clamped_min_imp_x,
+                                clamped_max_imp_x,
+                                is_roof,
+                            ) else {
+                                printer::print_error_with_input(
+                                    &IMP_X_SHOULD_BE_IN_RANGE
+                                        .format(&[min_valid_imp_x, max_valid_imp_x]),
+                                    imp_x,
+                                );
+                                return ParseResult::Matched;
+                            };
+                            println!("{GARG_X_RANGE}: {:.3}~{:.3}", floor_3(range_min), floor_3(range_max));
+                        }
+                        _ => {
+                            printer::print_too_many_arguments_error();
+                            return ParseResult::Matched;
+                        }
+                    }
+                    ParseResult::Matched
+                }
+                [garg_x] => {
+                    let garg_x_value = match eval_as_f32(garg_x, &mut self.eval_context) {
+                        Ok(v) => v,
+                        Err(EvalError::Eval(e)) => {
+                            printer::print_error(&e);
+                            return ParseResult::Matched;
+                        }
+                        Err(EvalError::Type(v)) => {
+                            printer::print_error_with_input(GARG_X_SHOULD_BE_NUMBER, &v);
+                            return ParseResult::Matched;
+                        }
                     };
-                    let Some((min_garg_x, max_garg_x)) =
-                        constants::min_max_garg_pos_of_imp_x(imp_x)
-                    else {
+                    if garg_x_value <= 400.0 {
                         printer::print_error_with_input(
-                            &IMP_X_SHOULD_BE_IN_RANGE
-                                .format(&[constants::MIN_IMP_X, constants::MAX_IMP_X]),
-                            imp_x.to_string().as_str(),
+                            &MIN_GARG_X_SHOULD_BE_LARGER_THAN_LOWER_BOUND.format(&[400]),
+                            garg_x,
                         );
                         return ParseResult::Matched;
-                    };
-                    println!("{GARG_X_RANGE}: {:.3}~{:.3}", min_garg_x, max_garg_x);
+                    }
+                    let imp_x_rnd_0 = game::get_imp_x(garg_x_value, 0.0, &self.scene);
+                    let imp_x_rnd_100 = game::get_imp_x(garg_x_value, 100.0, &self.scene);
+                    println!("{IMP_X_RANGE}: {:.3}~{:.3}", imp_x_rnd_0, imp_x_rnd_100);
                     ParseResult::Matched
                 }
                 _ => {
@@ -754,27 +892,32 @@ impl Parser {
         }
     }
 
-    fn parse_ice_times(ice_times: &[&str]) -> Result<Vec<i32>, ()> {
+    fn parse_ice_times(ice_times: &[&str], ctx: &mut HashMapContext) -> Result<Vec<i32>, ()> {
         match ice_times
             .iter()
-            .map(|&s| s.parse::<i32>())
+            .map(|&s| eval_as_i32(s, ctx))
             .collect::<Result<Vec<i32>, _>>()
         {
-            Err(_) => {
-                printer::print_error_with_input(
-                    ICE_TIMES_SHOULD_BE_INTEGER,
-                    format!("{:?}", ice_times).as_str(),
-                );
+            Err(EvalError::Eval(e)) => {
+                printer::print_error(&e);
+                Err(())
+            }
+            Err(EvalError::Type(v)) => {
+                printer::print_error_with_input(ICE_TIMES_SHOULD_BE_INTEGER, &v);
                 Err(())
             }
             Ok(ice_times) => Ok(ice_times),
         }
     }
 
-    fn parse_cob_time(cob_time: &&str) -> Result<i32, ()> {
-        match cob_time.parse::<i32>() {
-            Err(_) => {
-                printer::print_error_with_input(COB_TIME_SHOULD_BE_INTEGER, cob_time);
+    fn parse_cob_time(cob_time: &&str, ctx: &mut HashMapContext) -> Result<i32, ()> {
+        match eval_as_i32(cob_time, ctx) {
+            Err(EvalError::Eval(e)) => {
+                printer::print_error(&e);
+                Err(())
+            }
+            Err(EvalError::Type(v)) => {
+                printer::print_error_with_input(COB_TIME_SHOULD_BE_INTEGER, &v);
                 Err(())
             }
             Ok(cob_time) if cob_time < 0 => {
@@ -788,20 +931,28 @@ impl Parser {
         }
     }
 
-    fn parse_delay_time(delay_time: &&str) -> Result<i32, ()> {
-        match delay_time.parse::<i32>() {
-            Err(_) => {
-                printer::print_error_with_input(DELAY_TIME_SHOULD_BE_INTEGER, delay_time);
+    fn parse_delay_time(delay_time: &&str, ctx: &mut HashMapContext) -> Result<i32, ()> {
+        match eval_as_i32(delay_time, ctx) {
+            Err(EvalError::Eval(e)) => {
+                printer::print_error(&e);
+                Err(())
+            }
+            Err(EvalError::Type(v)) => {
+                printer::print_error_with_input(DELAY_TIME_SHOULD_BE_INTEGER, &v);
                 Err(())
             }
             Ok(delay) => Ok(delay),
         }
     }
 
-    fn parse_hit_row(hit_row: &&str, valid_hit_rows: &[i32]) -> Result<i32, ()> {
-        match hit_row.parse::<i32>() {
-            Err(_) => {
-                printer::print_error_with_input(HIT_ROW_SHOULD_BE_INTEGER, hit_row);
+    fn parse_hit_row(hit_row: &&str, valid_hit_rows: &[i32], ctx: &mut HashMapContext) -> Result<i32, ()> {
+        match eval_as_i32(hit_row, ctx) {
+            Err(EvalError::Eval(e)) => {
+                printer::print_error(&e);
+                Err(())
+            }
+            Err(EvalError::Type(v)) => {
+                printer::print_error_with_input(HIT_ROW_SHOULD_BE_INTEGER, &v);
                 Err(())
             }
             Ok(hit_row) if !(valid_hit_rows.contains(&hit_row)) => {
@@ -815,10 +966,14 @@ impl Parser {
         }
     }
 
-    fn parse_hit_col(hit_col: &&str) -> Result<f32, ()> {
-        match hit_col.parse::<f32>() {
-            Err(_) => {
-                printer::print_error_with_input(HIT_COL_SHOULD_BE_NUMBER, hit_col);
+    fn parse_hit_col(hit_col: &&str, ctx: &mut HashMapContext) -> Result<f32, ()> {
+        match eval_as_f32(hit_col, ctx) {
+            Err(EvalError::Eval(e)) => {
+                printer::print_error(&e);
+                Err(())
+            }
+            Err(EvalError::Type(v)) => {
+                printer::print_error_with_input(HIT_COL_SHOULD_BE_NUMBER, &v);
                 Err(())
             }
             Ok(hit_col) if !((0. ..10.).contains(&hit_col)) => {
@@ -840,7 +995,7 @@ impl Parser {
         }
     }
 
-    fn parse_min_max_hit_col(min_max_hit_col: &&str) -> Result<(f32, f32), ()> {
+    fn parse_min_max_hit_col(min_max_hit_col: &&str, ctx: &mut HashMapContext) -> Result<(f32, f32), ()> {
         match min_max_hit_col
             .replace('，', ",")
             .split(',')
@@ -857,8 +1012,8 @@ impl Parser {
             }
             [min_hit_col, max_hit_col] => {
                 match (
-                    Parser::parse_hit_col(min_hit_col),
-                    Parser::parse_hit_col(max_hit_col),
+                    Parser::parse_hit_col(min_hit_col, ctx),
+                    Parser::parse_hit_col(max_hit_col, ctx),
                 ) {
                     (Err(_), _) | (_, Err(_)) => Err(()),
                     (Ok(min_hit_col), Ok(max_hit_col)) => {
@@ -882,10 +1037,14 @@ impl Parser {
         }
     }
 
-    fn parse_cob_col(cob_col: &&str) -> Result<i32, ()> {
-        match cob_col.parse::<i32>() {
-            Err(_) => {
-                printer::print_error_with_input(COB_COL_SHOULD_BE_INTEGER, cob_col);
+    fn parse_cob_col(cob_col: &&str, ctx: &mut HashMapContext) -> Result<i32, ()> {
+        match eval_as_i32(cob_col, ctx) {
+            Err(EvalError::Eval(e)) => {
+                printer::print_error(&e);
+                Err(())
+            }
+            Err(EvalError::Type(v)) => {
+                printer::print_error_with_input(COB_COL_SHOULD_BE_INTEGER, &v);
                 Err(())
             }
             Ok(cob_col) if !((1..=8).contains(&cob_col)) => {
@@ -899,10 +1058,14 @@ impl Parser {
         }
     }
 
-    fn parse_doom_row(doom_row: &&str, valid_doom_rows: &[i32]) -> Result<i32, ()> {
-        match doom_row.parse::<i32>() {
-            Err(_) => {
-                printer::print_error_with_input(DOOM_ROW_SHOULD_BE_INTEGER, doom_row);
+    fn parse_doom_row(doom_row: &&str, valid_doom_rows: &[i32], ctx: &mut HashMapContext) -> Result<i32, ()> {
+        match eval_as_i32(doom_row, ctx) {
+            Err(EvalError::Eval(e)) => {
+                printer::print_error(&e);
+                Err(())
+            }
+            Err(EvalError::Type(v)) => {
+                printer::print_error_with_input(DOOM_ROW_SHOULD_BE_INTEGER, &v);
                 Err(())
             }
             Ok(doom_row) if !(valid_doom_rows.contains(&doom_row)) => {
@@ -916,10 +1079,14 @@ impl Parser {
         }
     }
 
-    fn parse_doom_col(doom_col: &&str) -> Result<i32, ()> {
-        match doom_col.parse::<i32>() {
-            Err(_) => {
-                printer::print_error_with_input(DOOM_COL_SHOULD_BE_INTEGER, doom_col);
+    fn parse_doom_col(doom_col: &&str, ctx: &mut HashMapContext) -> Result<i32, ()> {
+        match eval_as_i32(doom_col, ctx) {
+            Err(EvalError::Eval(e)) => {
+                printer::print_error(&e);
+                Err(())
+            }
+            Err(EvalError::Type(v)) => {
+                printer::print_error_with_input(DOOM_COL_SHOULD_BE_INTEGER, &v);
                 Err(())
             }
             Ok(doom_col) if !((1..=9).contains(&doom_col)) => {
@@ -936,6 +1103,7 @@ impl Parser {
     fn parse_garg_pos(
         garg_pos_args: &[&str],
         valid_garg_rows: &[i32],
+        ctx: &mut HashMapContext,
     ) -> Result<ParsedGargPos, ()> {
         let (garg_rows, min_max_garg_x, ice_flag) = match garg_pos_args {
             [] => {
@@ -943,18 +1111,18 @@ impl Parser {
                 (Err(()), Err(()), Err(()))
             }
             [garg_rows] => (
-                Parser::parse_garg_rows(garg_rows, valid_garg_rows),
+                Parser::parse_garg_rows(garg_rows, valid_garg_rows, ctx),
                 Ok(None),
                 Ok(None),
             ),
             [garg_rows, min_max_garg_x] => (
-                Parser::parse_garg_rows(garg_rows, valid_garg_rows),
-                Parser::parse_min_max_garg_x(min_max_garg_x).map(Some),
+                Parser::parse_garg_rows(garg_rows, valid_garg_rows, ctx),
+                Parser::parse_min_max_garg_x(min_max_garg_x, ctx).map(Some),
                 Ok(None),
             ),
             [garg_rows, min_max_garg_x, ice_flag] => (
-                Parser::parse_garg_rows(garg_rows, valid_garg_rows),
-                Parser::parse_min_max_garg_x(min_max_garg_x).map(Some),
+                Parser::parse_garg_rows(garg_rows, valid_garg_rows, ctx),
+                Parser::parse_min_max_garg_x(min_max_garg_x, ctx).map(Some),
                 Parser::parse_ice_flag(ice_flag).map(Some),
             ),
             _ => {
@@ -972,15 +1140,19 @@ impl Parser {
         }
     }
 
-    fn parse_garg_rows(garg_rows: &&str, valid_garg_rows: &[i32]) -> Result<Vec<i32>, ()> {
+    fn parse_garg_rows(garg_rows: &&str, valid_garg_rows: &[i32], ctx: &mut HashMapContext) -> Result<Vec<i32>, ()> {
         match garg_rows
             .replace('，', ",")
             .split(',')
-            .map(|s| s.parse::<i32>())
+            .map(|s| eval_as_i32(s, ctx))
             .collect::<Result<Vec<i32>, _>>()
         {
-            Err(_) => {
-                printer::print_error_with_input(GARG_ROWS_SHOULD_BE_INTEGER, garg_rows);
+            Err(EvalError::Eval(e)) => {
+                printer::print_error(&e);
+                Err(())
+            }
+            Err(EvalError::Type(v)) => {
+                printer::print_error_with_input(GARG_ROWS_SHOULD_BE_INTEGER, &v);
                 Err(())
             }
             Ok(garg_rows) => {
@@ -1002,7 +1174,7 @@ impl Parser {
         }
     }
 
-    fn parse_min_max_garg_x(min_max_garg_x: &&str) -> Result<(f32, f32), ()> {
+    fn parse_min_max_garg_x(min_max_garg_x: &&str, ctx: &mut HashMapContext) -> Result<(f32, f32), ()> {
         match min_max_garg_x
             .replace('，', ",")
             .split(',')
@@ -1018,13 +1190,17 @@ impl Parser {
                 Err(())
             }
             [min_garg_x, max_garg_x] => {
-                match (min_garg_x.parse::<f32>(), max_garg_x.parse::<f32>()) {
-                    (Err(_), _) => {
-                        printer::print_error_with_input(MIN_GARG_X_SHOULD_BE_NUMBER, min_garg_x);
+                match (eval_as_f32(min_garg_x, ctx), eval_as_f32(max_garg_x, ctx)) {
+                    (Err(EvalError::Eval(e)), _) | (_, Err(EvalError::Eval(e))) => {
+                        printer::print_error(&e);
                         Err(())
                     }
-                    (_, Err(_)) => {
-                        printer::print_error_with_input(MAX_GARG_X_SHOULD_BE_NUMBER, max_garg_x);
+                    (Err(EvalError::Type(v)), _) => {
+                        printer::print_error_with_input(MIN_GARG_X_SHOULD_BE_NUMBER, &v);
+                        Err(())
+                    }
+                    (_, Err(EvalError::Type(v))) => {
+                        printer::print_error_with_input(MAX_GARG_X_SHOULD_BE_NUMBER, &v);
                         Err(())
                     }
                     (Ok(min_garg_x), Ok(max_garg_x)) if min_garg_x > max_garg_x => {
@@ -1060,14 +1236,22 @@ impl Parser {
         }
     }
 
-    fn parse_ice_flag(ice_mode: &&str) -> Result<bool, ()> {
+    fn parse_ice_flag(ice_mode: &&str) -> Result<i32, ()> {
         if *ice_mode == "u" {
-            Ok(false)
+            Ok(0)
         } else if *ice_mode == "i" {
-            Ok(true)
+            Ok(100000)
         } else {
             printer::print_error_with_input(ICE_FLAG_SHOULD_BE_U_OR_I, ice_mode);
             Err(())
+        }
+    }
+
+    pub fn eval_expr(&mut self, input: &str) {
+        match eval_with_context_mut(input, &mut self.eval_context) {
+            Ok(Value::Empty) => {}
+            Ok(value) => println!("{}", value),
+            Err(e) => printer::print_error(&e.to_string()),
         }
     }
 }

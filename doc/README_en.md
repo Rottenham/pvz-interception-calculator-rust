@@ -16,6 +16,7 @@ A rewrite of the original Interception Calculator in rust with various issues fi
 | hit (cob tail col) (delay) |Calc hit col that hits all gargs (may specify delay)<br>eg. `$ hit` -> Calc hit col that hits all gargs<br>`$ wave 300 $ hit 50` -> Calc hit col that hits all gargs at 350cs<br>`$ wave 300 $ hit -50` -> Calc hit col that hits all gargs at 250cs |
 | nohit (cob tail col) (delay) |Calc hit col that doesn't hit any garg (may specify delay) |
 | max [hit row] [hit col range]<br>> [garg rows] (garg x range) (u/i) | Find hit col that harmlessly intercepts with max delay (may specify ice mode)<br>eg. `$ max 1 7,7.5 > 1,2` -> For hit row 1 and hit col 7~7.5, find hit col that harmlessly intercepts gargs with max delay |
-| imp [imp x]          |    Calc x range of garg who can throw imp of this x |
+| imp [garg x]         |    Calc imp x range for this garg x |
+| imp garg [imp x\|x1,x2] | Calc garg x range for this imp x / imp x range |
 | ?/help              |     Show this help |
 |  about              |     About Interception Calculator |

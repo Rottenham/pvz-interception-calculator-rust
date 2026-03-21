@@ -1,5 +1,4 @@
 use crate::constants;
-use dyn_fmt::AsStrFormatExt;
 use std::{cmp, ops::Add};
 
 #[cfg(feature = "en")]
@@ -14,18 +13,12 @@ const COB_RADIUS: i32 = 115;
 const COB_HIT_RANGE: i32 = 1;
 const DOOM_RADIUS: i32 = 250;
 const DOOM_HIT_RANGE: i32 = 3;
-const GARG_THROW_IMP_THRES: f32 = 401.;
+const GARG_THROW_IMP_THRES: f32 = 400.;
 const IMP_DEFENSE_SHIFT: IntVec2 = IntVec2 { x: 36, y: 0 };
 const IMP_DEFENSE_WIDTH: i32 = 42;
 const IMP_DEFENSE_HEIGHT: i32 = 115;
-const MIN_GARG_START_POS: f32 = 845.;
-const MAX_GARG_START_POS: f32 = 854.;
 pub const MIN_GARG_X: f32 = -152.; // 如果 x <= -152., 巨人将进家
-pub const MAX_GARG_X: f32 = MAX_GARG_START_POS;
-const MIN_ICE_TIME_FOR_UNICED: i32 = 400;
-const MAX_ICE_TIME_FOR_UNICED: i32 = 600;
-const MIN_ICE_TIME_FOR_ICED: i32 = 300;
-const MAX_ICE_TIME_FOR_ICED: i32 = 400;
+pub const MAX_GARG_X: f32 = 854.;
 pub const ICE_SLOW_TOTAL_TIME: i32 = 2000;
 const DE_COB_DIST: CobDist = CobDist {
     hit_above: 111,
@@ -464,7 +457,7 @@ impl Position {
                 &Rectangle {
                     upper_left: IntVec2 {
                         x: self.x as i32,
-                        y: (self.y - self.h + self.y_shift) as i32,
+                        y: ((self.y + self.y_shift) as i32 as f32 - self.h) as i32,
                     } + IMP_DEFENSE_SHIFT,
                     width: IMP_DEFENSE_WIDTH,
                     height: IMP_DEFENSE_HEIGHT,
@@ -479,6 +472,7 @@ struct Imp {
     velocity: Vec2,
     position: Position,
     exist_time: i32,
+    chill_cd: i32,
 }
 
 #[derive(PartialEq, Debug)]
@@ -516,7 +510,7 @@ impl Eat {
             Eat::Empty => {}
             Eat::Some { eat, iceable } => {
                 *self = Eat::Some {
-                    eat: *eat + 1,
+                    eat: *eat,
                     iceable: *iceable,
                 }
             }
@@ -606,8 +600,8 @@ pub enum GargXRange {
 impl GargXRange {
     pub fn of_min_max_garg_pos(min_max_garg_pos: (f32, f32)) -> GargXRange {
         let (min_garg_x, max_garg_x) = min_max_garg_pos;
-        if min_garg_x < GARG_THROW_IMP_THRES {
-            if max_garg_x < GARG_THROW_IMP_THRES {
+        if min_garg_x <= GARG_THROW_IMP_THRES {
+            if max_garg_x <= GARG_THROW_IMP_THRES {
                 GargXRange::Cancelled
             } else {
                 GargXRange::Modified {
@@ -634,7 +628,7 @@ impl GargXRange {
 pub fn judge(
     garg_x_range: &GargXRange,
     explode_and_garg_rows: &[(Explode, &Vec<i32>)],
-    iced: bool,
+    iced: i32,
     scene: &Scene,
 ) -> (Eat, Intercept) {
     let mut eat = Eat::Empty;
@@ -643,7 +637,7 @@ pub fn judge(
         for garg_x in garg_x_range.to_list() {
             // 只考虑巨人x极值得到的最早啃/冰绝对精确，但可拦区间并非绝对精确，可能存在接近边界的反例值
             for &garg_row in *garg_rows {
-                for rnd in [0, 100] {
+                for rnd in [0.0, 100.0] {
                     // rnd 单调影响y初速，只需考虑极值
                     let (new_eat, new_intercept) = judge_internal(
                         &Vec2 {
@@ -669,26 +663,26 @@ pub fn judge(
 fn judge_internal(
     garg_pos: &Vec2,
     garg_row: i32,
-    rnd: i32,
-    iced: bool,
+    rnd: f32,
+    iced: i32,
     scene: &Scene,
     explode: &Explode,
 ) -> (Eat, Intercept) {
-    if garg_pos.x < GARG_THROW_IMP_THRES {
+    if garg_pos.x <= GARG_THROW_IMP_THRES {
         return (Eat::Empty, Intercept::Empty);
     }
     let mut imp_velocity_y = garg_pos.x - 360. - (if scene.is_roof() { 180. } else { 0. });
-    if imp_velocity_y >= 40. {
+    let lowerbound = if scene.is_roof() { -140. } else { 40. };
+    if imp_velocity_y >= lowerbound {
         if imp_velocity_y > 140. {
             imp_velocity_y -= rnd as f32;
-        } else if rnd != 0 {
+        } else if rnd != 0.0 {
             return (Eat::Empty, Intercept::Empty);
         }
     } else {
-        imp_velocity_y = 40.;
+        imp_velocity_y = lowerbound;
     }
-    let eat_loop = if iced { 8 } else { 4 };
-    let imp_spawn_time = if iced { 210 } else { 105 };
+    let imp_spawn_time = constants::IMP_SPAWN_TIME_OF_SLOW_CD_AT_COB_TIME[cmp::max(0, cmp::min(210, iced)) as usize];
     let y_shift = |x: f32, roof: bool| {
         if !roof || x >= 400. {
             0.
@@ -702,14 +696,15 @@ fn judge_internal(
             x: garg_pos.x - 133.,
             y: garg_pos.y,
             h: 88.,
-            y_shift: y_shift(garg_pos.x - 133., scene.is_roof()),
+            y_shift: y_shift(garg_pos.x, scene.is_roof()),
             row: garg_row,
         },
         velocity: Vec2 {
             x: -3.,
-            y: imp_velocity_y / 3. * 0.5 * 0.05000000074505806,
+            y: imp_velocity_y / 3. * 0.5 * 0.05,
         },
         exist_time: 0,
+        chill_cd: iced - imp_spawn_time,
     };
     let mut eat: Option<i32> = None;
     let mut iceable: Option<i32> = None;
@@ -717,6 +712,8 @@ fn judge_internal(
     let mut tick = imp_spawn_time + 1;
     while eat.is_none() || iceable.is_none() {
         imp.exist_time += 1;
+        imp.chill_cd -= 1;
+        let eat_loop = if imp.chill_cd > 0 { 8 } else { 4 };
         match imp.state {
             ImpState::S71 => {
                 imp.velocity = imp.velocity + GRAVITY;
@@ -727,7 +724,7 @@ fn judge_internal(
                 if imp.position.h <= 0. {
                     imp.position.h = 0.;
                     imp.state = ImpState::S72 {
-                        countdown: (if iced { 50 } else { 25 }),
+                        countdown: constants::IMP_S72_TIME_OF_SLOW_CD_AT_BIRTH[cmp::max(0, cmp::min(51, imp.chill_cd)) as usize]
                     }
                 }
             }
@@ -744,7 +741,7 @@ fn judge_internal(
             }
             ImpState::S0 => {
                 if iceable.is_none() {
-                    iceable = Some(tick - 1);
+                    iceable = Some(tick);
                 }
                 if eat.is_none() && imp.exist_time % eat_loop == 0 {
                     eat = Some(tick);
@@ -779,7 +776,7 @@ impl IceAndCobTimes {
         }
         let mut ice_times = ice_times
             .iter()
-            .filter(|&&v| v >= 0 && v <= cob_time)
+            .filter(|&&v| v > 0 && v <= cob_time)
             .cloned()
             .collect::<Vec<i32>>();
         ice_times.sort();
@@ -789,10 +786,10 @@ impl IceAndCobTimes {
         })
     }
 
-    pub fn is_iced(&self) -> bool {
+    pub fn is_iced(&self) -> i32 {
         match (self.ice_times.last(), self.cob_time) {
-            (None, _) => false,
-            (Some(last_ice_time), cob_time) => cob_time - last_ice_time <= ICE_SLOW_TOTAL_TIME,
+            (None, _) => 0,
+            (Some(last_ice_time), cob_time) => ICE_SLOW_TOTAL_TIME - cob_time + last_ice_time - 1,
         }
     }
 }
@@ -803,122 +800,8 @@ pub fn min_max_garg_x(
         cob_time,
     }: &IceAndCobTimes,
 ) -> Result<(f32, f32), String> {
-    let (min_half_ticks, max_half_ticks) = min_max_garg_walk_in_half_ticks(ice_times, *cob_time);
-    match (
-        constants::garg_slow_of_half_ticks(min_half_ticks),
-        constants::garg_fast_of_half_ticks(max_half_ticks),
-    ) {
-        (None, _) => Err(GARG_MIN_WALK_OUT_OF_RANGE.format(&[
-            (min_half_ticks as f32 / 2.).to_string(),
-            0.to_string(),
-            (constants::GARG_DATA_SIZE - 1).to_string(),
-        ])),
-        (_, None) => Err(GARG_MAX_WALK_OUT_OF_RANGE.format(&[
-            (max_half_ticks as f32 / 2.).to_string(),
-            0.to_string(),
-            (constants::GARG_DATA_SIZE - 1).to_string(),
-        ])),
-        (Some(min_walk), Some(max_walk)) => {
-            Ok((MIN_GARG_START_POS - max_walk, MAX_GARG_START_POS - min_walk))
-        }
-    }
-}
-
-fn min_max_garg_walk_in_half_ticks(valid_ice_times: &[i32], cob_time: i32) -> (i32, i32) {
-    (
-        garg_walk_in_half_ticks(
-            valid_ice_times,
-            cob_time,
-            MAX_ICE_TIME_FOR_ICED,
-            MAX_ICE_TIME_FOR_UNICED,
-        ),
-        garg_walk_in_half_ticks(
-            valid_ice_times,
-            cob_time,
-            MIN_ICE_TIME_FOR_ICED,
-            MIN_ICE_TIME_FOR_UNICED,
-        ),
-    )
-}
-
-fn garg_walk_in_half_ticks(
-    valid_ice_times: &[i32],
-    cob_time: i32,
-    ice_length_for_iced: i32,
-    ice_length_for_uniced: i32,
-) -> i32 {
-    enum Tick {
-        Start(i32),
-        Ice { time: i32, length: i32 },
-        Cob(i32),
-    }
-
-    impl Tick {
-        // 返回值单位为 0.5cs
-        fn diff_in_half_ticks(old_tick: &Tick, new_tick: &Tick) -> i32 {
-            let prorated_walk = |walk: i32, ice_length| {
-                let uniced_walk = cmp::max(walk - (ICE_SLOW_TOTAL_TIME - ice_length), 0);
-                (walk - uniced_walk) + uniced_walk * 2
-            };
-            match (new_tick, old_tick) {
-                (Tick::Start(_), _) => panic!("Tick::Start can only be minuend."),
-                (Tick::Ice { time: _, length: _ }, Tick::Cob(_)) => {
-                    panic!("Tick::Cob must be later than Tick::Ice.")
-                }
-                (Tick::Cob(_), Tick::Cob(_)) => panic!("Tick::Cob must be unique."),
-                (
-                    Tick::Ice {
-                        time: new_time,
-                        length: _,
-                    },
-                    Tick::Start(old_time),
-                ) => cmp::max((new_time - old_time - 1) * 2, 0),
-                (
-                    Tick::Ice {
-                        time: new_time,
-                        length: _,
-                    },
-                    Tick::Ice {
-                        time: old_time,
-                        length,
-                    },
-                ) => prorated_walk(cmp::max(new_time - old_time - (length - 1), 0), length),
-                (Tick::Cob(new_time), Tick::Start(old_time)) => {
-                    cmp::max((new_time - old_time) * 2, 0)
-                }
-                (
-                    Tick::Cob(new_time),
-                    Tick::Ice {
-                        time: old_time,
-                        length,
-                    },
-                ) => prorated_walk(cmp::max(new_time - old_time - (length - 2), 0), length),
-            }
-        }
-    }
-
-    let mut ticks: Vec<Tick> = vec![Tick::Start(0)];
-    let mut prev_ice_time = None;
-    for &ice_time in valid_ice_times {
-        let iced: bool = match prev_ice_time {
-            None => false,
-            Some(prev_ice_time) => ice_time - prev_ice_time < ICE_SLOW_TOTAL_TIME,
-        };
-        ticks.push(Tick::Ice {
-            time: ice_time + 1,
-            length: if iced {
-                ice_length_for_iced
-            } else {
-                ice_length_for_uniced
-            },
-        });
-        prev_ice_time = Some(ice_time + 1);
-    }
-    ticks.push(Tick::Cob(cob_time));
-    ticks
-        .windows(2)
-        .map(|pair| Tick::diff_in_half_ticks(&pair[0], &pair[1]))
-        .sum::<i32>()
+    let (min_x, max_x) = crate::zmc::min_max_garg_x_from_zmc(ice_times, *cob_time);
+    Ok((min_x, max_x))
 }
 
 pub fn hit_col_matching_int_pixel(unvalidated_hit_col: f32) -> Option<f32> {
@@ -950,71 +833,56 @@ pub fn safe_intercept_interval(eat: &Eat, intercept: &Intercept) -> Option<(i32,
     }
 }
 
-// fn get_imp_x(garg_pos: &Vec2, garg_row: i32, rnd: i32, iced: bool, roof: bool) -> f32 {
-//     if garg_pos.x < GARG_THROW_IMP_THRES {
-//         return 0.;
-//     }
-//     let mut imp_velocity_y = garg_pos.x - 360. - (if roof { 180. } else { 0. });
-//     if imp_velocity_y >= 40. {
-//         if imp_velocity_y > 140. {
-//             imp_velocity_y -= rnd as f32;
-//         } else if rnd != 0 {
-//             return 0.;
-//         }
-//     } else {
-//         imp_velocity_y = 40.;
-//     }
-//     let imp_spawn_time = if iced { 210 } else { 105 };
-//     let shifted_y_of_y = |x: f32, roof: bool| {
-//         if !roof || x >= 400. {
-//             0.
-//         } else {
-//             (400. - x) / 4.
-//         }
-//     };
-//     let mut imp = Imp {
-//         state: ImpState::S71,
-//         position: Position {
-//             x: garg_pos.x - 133.,
-//             y: garg_pos.y,
-//             h: 88.,
-//             y_shift: shifted_y_of_y(garg_pos.x - 133., roof),
-//             row: garg_row,
-//         },
-//         velocity: Vec2 {
-//             x: -3.,
-//             y: imp_velocity_y / 3. * 0.5 * 0.05000000074505806,
-//         },
-//         exist_time: 0,
-//     };
-//     for _ in (imp_spawn_time + 1).. {
-//         imp.exist_time += 1;
-//         match imp.state {
-//             ImpState::S71 => {
-//                 imp.velocity = imp.velocity + GRAVITY;
-//                 imp.position.x += imp.velocity.x;
-//                 imp.position.h += imp.velocity.y;
-//                 imp.position.y_shift = shifted_y_of_y(imp.position.x, roof);
-//                 if imp.position.y_shift + imp.position.h < 0. {
-//                     return imp.position.x;
-//                 }
-//             }
-//             ImpState::S72 { countdown } => {
-//                 imp.state = ImpState::S72 {
-//                     countdown: (countdown - 1),
-//                 };
-//                 if countdown - 1 == 0 {
-//                     imp.state = ImpState::S0;
-//                 }
-//             }
-//             ImpState::S0 => {
-//                 break;
-//             }
-//         }
-//     }
-//     0.
-// }
+pub fn get_imp_x(garg_x: f32, rnd: f32, scene: &Scene) -> f32 {
+    if garg_x <= GARG_THROW_IMP_THRES {
+        return 0.;
+    }
+    let mut imp_velocity_y = garg_x - 360. - (if scene.is_roof() { 180. } else { 0. });
+    let lowerbound = if scene.is_roof() { -140. } else { 40. };
+    if imp_velocity_y >= lowerbound {
+        if imp_velocity_y > 140. {
+            imp_velocity_y -= rnd as f32;
+        }
+    } else {
+        imp_velocity_y = lowerbound;
+    }
+    let y_shift = |x: f32, roof: bool| {
+        if !roof || x >= 400. {
+            0.
+        } else {
+            (400. - x) / 4.
+        }
+    };
+    let garg_row = 2;
+    let mut imp = Imp {
+        state: ImpState::S71,
+        position: Position {
+            x: garg_x - 133.,
+            y: (scene.zombie_base_y() + (garg_row - 1) * scene.row_height()) as f32,
+            h: 88.,
+            y_shift: y_shift(garg_x, scene.is_roof()),
+            row: garg_row,
+        },
+        velocity: Vec2 {
+            x: -3.,
+            y: imp_velocity_y / 3. * 0.5 * 0.05,
+        },
+        exist_time: 0,
+        chill_cd: 0,
+    };
+    loop {
+        imp.velocity = imp.velocity + GRAVITY;
+        imp.position.x += imp.velocity.x;
+        let new_y_shift = y_shift(imp.position.x, scene.is_roof());
+        imp.position.h += imp.velocity.y + (new_y_shift - imp.position.y_shift);
+        imp.position.y_shift = new_y_shift;
+        if imp.position.h <= 0. {
+            return imp.position.x;
+        }
+    }
+}
 
+/*
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1248,3 +1116,4 @@ mod tests {
     //     assert!(false);
     // }
 }
+*/

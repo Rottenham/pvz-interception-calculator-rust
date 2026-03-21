@@ -3,3 +3,4 @@ mod game;
 pub mod parser;
 mod printer;
 pub mod lang;
+pub mod zmc;

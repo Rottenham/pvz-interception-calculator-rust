@@ -1,8 +1,8 @@
 // validate_garg_x_range
 pub const GARG_X_RANGE_CANCELLED: &str =
-    "gargantuars with x < 401 do not throw imps; calculation skipped.";
+    "gargantuars with x ≤ 400 do not throw imps; calculation skipped.";
 pub const GARG_X_RANGE_MODIFIED: &str =
-    "gargantuars with x < 401 do not throw imps; x = {}~{} is used instead.";
+    "gargantuars with x ≤ 400 do not throw imps; x = {}~{} is used instead.";
 
 // parse_scene
 pub const SET_FRONTYARD: &str = "Scene has been set to Frontyard.";
@@ -32,11 +32,13 @@ pub const NEED_HIT_COL_RANGE_COB_COL: &str =
 pub const CANNOT_INTERCEPT_WITHOUT_HARM: &str = "Cannot intercept without causing harm.";
 pub const HIT_COL_WITH_MAX_DELAY: &str = "Cob hit col with max delay";
 
-// parse_garg_x_range_of_imp_x
-pub const NEED_IMP_X_RANGE: &str =
-    "Please provide comma-separated imp x range (imp x must be integer).";
+// parse_imp
+pub const NEED_GARG_X_OR_IMP_X: &str = "Please provide garg x, or use: imp garg [imp x].";
+pub const NEED_IMP_X_RANGE: &str = "Please provide imp x (integer), or two comma-separated integers.";
 pub const IMP_X_SHOULD_BE_INTEGER: &str = "imp x should be integer";
 pub const IMP_X_SHOULD_BE_IN_RANGE: &str = "should satisfy {} ≤ imp x ≤ {}";
+pub const GARG_X_SHOULD_BE_NUMBER: &str = "garg x should be number";
+pub const IMP_X_RANGE: &str = "Imp x range";
 
 // parse_ice_times
 pub const ICE_TIMES_SHOULD_BE_INTEGER: &str = "ice times should be integer";
@@ -180,10 +182,11 @@ is committed to be as close to the actual game as possible."#;
 pub const HELLO: &str = r#"Source code is available under MIT license:
 https://github.com/Rottenham/pvz-interception-calculator-rust
 
-Interception Calculator v2.0.13
+Interception Calculator v2.0.15
 Current scene: Backyard.
 Type '?' for help; press ↑ to show previous commands.
 
+In this program, perfect pre-ice corresponds to 1, and ICE3 corresponds to 11.
 Results are based on cob activation by default.
 For ash activation, subtract 1 from the results."#;
 
@@ -242,7 +245,8 @@ max [hit row] [hit col range]
                             For hit row 1 and hit col 7~7.5, find hit col that
                             harmlessly intercepts gargs with max delay
 
-imp [imp x]             Calc x range of garg who can throw imp of this x
+imp [garg x]            Calc imp x range for this garg x
+imp garg [imp x|x1,x2]  Calc garg x range for this imp x or imp x range
 
 ?/help                  Show this help
 about                   About Interception Calculator"#;

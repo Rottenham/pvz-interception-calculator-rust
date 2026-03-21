@@ -69,6 +69,8 @@ pub fn print_ice_times_and_cob_time(
             format!(" {}{COB_ACTIVATE}", cob_time)
         }
     );
+    let min_garg_x = (min_garg_x * 1000.0).floor() / 1000.0;
+    let max_garg_x = (max_garg_x * 1000.0).floor() / 1000.0;
     println!("{GARG_X_RANGE}: [{:.3}, {:.3}]", min_garg_x, max_garg_x);
 }
 
